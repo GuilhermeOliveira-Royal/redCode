@@ -895,6 +895,9 @@ details[open]::details-content { block-size: auto; }
 /* Troca de conversa: o conteúdo some e volta rápido, sem "piscar" */
 .centro { transition: opacity .16s ease; }
 .centro.trocando { opacity: .25; }
+.trabalhando:has(.nota-comando-longo) { flex-wrap: wrap; }
+.nota-comando-longo { flex-basis: 100%; font-size: 12px; color: var(--grafite); opacity: 0; animation: aparece-nota .4s ease forwards; }
+@keyframes aparece-nota { to { opacity: 1; } }
 body.iniciando-conversa .lateral > #lateral, body.iniciando-conversa .lateral > #painelGit { opacity: .35; pointer-events: none; transition: opacity .2s; }
 body.iniciando-conversa #mensagem { opacity: .6; }
 .trabalhando.interrompida .feito { color: var(--atencao); }
@@ -1606,10 +1609,19 @@ function abreArquivoCitado(texto, noEditor) {
     let caminho = m[1].replace(/[\\/]+$/, '');
     const linha = m[2] ? Number(m[2]) : undefined;
     const cwd = pastaDaConversa();
-    // Relativo: resolve a partir da pasta da conversa
+    // Relativo: o servidor procura na pasta da conversa e nas worktrees do repo (o Claude pode ter
+    // trabalhado em outra, ex.: royal-master) e devolve onde o arquivo existe de fato
     if (!/^(?:[A-Za-z]:[\\/]|\\\\)/.test(caminho)) {
         if (!cwd) return recado('Abra uma conversa para resolver o caminho relativo.');
-        caminho = cwd.replace(/[\\/]+$/, '') + '\\' + caminho.replace(/^\.?[\\/]/, '').replace(/\//g, '\\');
+        const rel = caminho;
+        return getPainel(`/api/resolver-arquivo?cwd=${encodeURIComponent(cwd)}&caminho=${encodeURIComponent(rel)}`)
+            .then(r => {
+                if (!r.caminho) return recado(`Não achei ${rel} na pasta da conversa nem nas worktrees do repositório.`);
+                const outra = r.base && r.base.toLowerCase() !== cwd.replace(/[\\/]+$/, '').toLowerCase();
+                abreArquivoCitado(r.caminho + (linha ? ':' + linha : ''), noEditor && !outra);
+                if (outra) recado(`Abrindo de ${r.base}${r.achados.length > 1 ? ` (existe em ${r.achados.length} pastas; esta é a mais recente)` : ''}`);
+            })
+            .catch(e => recado(e.message));
     }
     const norm = (p) => p.replace(/\//g, '\\').toLowerCase().replace(/\\+$/, '');
     if (noEditor && cwd && (norm(caminho) + '\\').startsWith(norm(cwd) + '\\')) return abreEditor(caminho, linha);
@@ -2803,8 +2815,12 @@ function indicadorTrabalhando(d) {
         texto = `Esperando o agente ${agenteFundo.tipoAgente} terminar (${agenteFundo.descricao})…`;
     }
     const desde = (emCurso || ultimo || {}).hora;
+    // Comando longo: o Claude Code só grava a saída quando ele termina. Depois de 1 min rodando,
+    // avisa isso (a tela não é redesenhada enquanto nada muda: o atraso vem do próprio CSS)
+    const faltam = emCurso && emCurso.tipo === 'comando' ? Math.max(0, 60 - (Date.now() - Date.parse(emCurso.hora || 0)) / 1000) : null;
+    const nota = faltam === null ? '' : `<span class="nota-comando-longo" style="animation-delay:${faltam.toFixed(1)}s">A saída do comando aparece aqui quando ele terminar.</span>`;
     return `<div class="trabalhando com-robo" role="status">${roboHtml()}<strong>${esc(texto)}</strong>
-        <span class="decorrido" data-desde="${esc(desde || '')}"></span></div>`;
+        <span class="decorrido" data-desde="${esc(desde || '')}"></span>${nota}</div>`;
 }
 
 function desenhaPrincipal(d) {

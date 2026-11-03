@@ -594,7 +594,12 @@ function situacaoSessao(estado, mtime) {
     // Só conta agente com atividade recente ou lançado há menos de 30 min
     const agentesRodando = Object.values(estado.agentes).filter(a => a.status === 'rodando'
         && (a.ativoHa !== undefined || Date.now() - Date.parse(a.inicio || 0) < 30 * 60 * 1000)).length;
-    const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000;
+    // Ferramenta começada e sem resultado (ex.: comando longo): o transcript fica parado enquanto
+    // ela roda, então conta como ativa até 15 min do início (o limite de um comando é 10 min)
+    const ultimoEvento = estado.eventos[estado.eventos.length - 1];
+    const ferramentaAberta = ultimoEvento && ultimoEvento.id && !ultimoEvento.fim && ultimoEvento.tipo !== 'agente'
+        && Date.now() - Date.parse(ultimoEvento.hora || 0) < 15 * 60 * 1000;
+    const recente = Date.now() - mtime < SEGUNDOS_ATIVA * 1000 || ferramentaAberta;
     const ativa = (!estado.turnoEncerrado && !estado.pergunta && recente) || (agentesRodando > 0 && !estado.pergunta);
     return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando };
 }
@@ -1046,12 +1051,13 @@ async function rotaChat(req, res, url) {
             return responde(res, 200, alem.modelos(leDados()));
         } catch (e) { return responde(res, 400, { erro: e.message }); }
     }
-    if (req.method === 'GET' && (url.pathname === '/api/worktree/repo' || url.pathname === '/api/worktrees')) {
+    if (req.method === 'GET' && (url.pathname === '/api/worktree/repo' || url.pathname === '/api/worktrees' || url.pathname === '/api/resolver-arquivo')) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
         const cwd = url.searchParams.get('cwd');
         if (!pastaConhecida(cwd)) return responde(res, 403, { erro: 'Pasta de projeto desconhecida.' });
         try {
             if (url.pathname === '/api/worktree/repo') return responde(res, 200, { repo: await worktrees.repoDe(cwd) });
+            if (url.pathname === '/api/resolver-arquivo') return responde(res, 200, await worktrees.resolverArquivo(cwd, url.searchParams.get('caminho')));
             return responde(res, 200, await worktrees.listar(cwd));
         } catch (e) { return responde(res, 500, { erro: e.message }); }
     }
@@ -1342,7 +1348,7 @@ const servidor = http.createServer(async (req, res) => {
             // Caminho direto em node_modules (o "exports" dos pacotes pode bloquear o require.resolve)
             return res.end(fs.readFileSync(path.join(__dirname, 'node_modules', rel)));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/worktree/repo', '/api/worktrees', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/sessoes') return responde(res, 200, listaSessoes());
         if (url.pathname === '/api/uso') {
             const agora = Date.now();

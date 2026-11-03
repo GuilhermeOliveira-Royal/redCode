@@ -102,4 +102,36 @@ async function remover(cwd, caminho) {
     return { removido: alvo.caminho, branchMantido: alvo.branch };
 }
 
-module.exports = { repoDe, criar, listar, remover };
+// Caminho relativo citado numa conversa (ex.: "database/x.sql"): acha onde ele existe de fato.
+// Primeiro a pasta da conversa; depois a raiz do repo e as outras worktrees dele (o Claude pode
+// ter trabalhado em outra, ex.: royal-master). Achou em mais de uma: a modificada por último.
+async function resolverArquivo(cwd, rel) {
+    const r = String(rel || '').replace(/[\\/]+/g, path.sep).replace(/^\.?[\\/]+/, '');
+    if (!r || r.length > 400 || path.isAbsolute(r) || r.split(path.sep).includes('..')) return { caminho: null, achados: [] };
+    const pasta = path.resolve(cwd);
+    const bases = [pasta];
+    const repo = await repoDe(pasta);
+    if (repo) {
+        const sub = path.relative(repo, pasta);   // conversa numa subpasta do repo (ex.: admin)
+        bases.push(repo);
+        try {
+            const texto = await git(['worktree', 'list', '--porcelain'], repo);
+            for (const m of texto.matchAll(/^worktree (.+)$/gm)) {
+                const raiz = path.resolve(m[1].trim().replace(/\//g, path.sep));
+                if (sub && !sub.startsWith('..')) bases.push(path.join(raiz, sub));
+                bases.push(raiz);
+            }
+        } catch (e) { /* sem worktrees */ }
+    }
+    const achados = [];
+    for (const base of [...new Set(bases.map(b => b.toLowerCase()))].map(b => bases.find(x => x.toLowerCase() === b))) {
+        const alvo = path.join(base, r);
+        try { achados.push({ caminho: alvo, base, mtime: fs.statSync(alvo).mtimeMs }); } catch (e) { /* não existe aqui */ }
+    }
+    if (!achados.length) return { caminho: null, achados };
+    const naConversa = achados.find(a => a.base.toLowerCase() === pasta.toLowerCase());
+    const escolhido = naConversa || [...achados].sort((a, b) => b.mtime - a.mtime)[0];
+    return { caminho: escolhido.caminho, base: escolhido.base, achados };
+}
+
+module.exports = { repoDe, criar, listar, remover, resolverArquivo };
