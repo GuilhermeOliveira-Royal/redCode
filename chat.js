@@ -7,6 +7,7 @@
 // há um tempo e sem agentes rodando.
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const editorArquivos = require('./editor-arquivos');
 
@@ -19,6 +20,12 @@ async function carregaSdk() {
 
 const MODOS = ['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions'];
 const MINUTOS_OCIOSA = 20;
+
+// Conversas "Chat" (sem ferramentas de código) rodam nesta pasta neutra, sempre a mesma: o resume do SDK
+// depende do cwd. Calculada do APPDATA, e não da pasta de dados do painel, que muda entre desktop e navegador.
+const CHAT_DIR = path.join(process.env.APPDATA || os.homedir(), 'Red Code', 'chat');
+const ehChat = (cwd) => !!cwd && path.resolve(cwd).toLowerCase() === path.resolve(CHAT_DIR).toLowerCase();
+const INSTRUCAO_CHAT = 'Você é o Claude, em uma conversa comum dentro do app Red Code. Esta conversa não tem acesso a arquivos, terminal, internet nem ferramentas: responda só com o que você sabe e com o que o usuário escrever ou colar. Se algo exigir mexer em arquivos ou rodar comandos, diga que isso é feito numa conversa do modo Código. Responda no idioma do usuário.';
 
 // chave -> conversa iniciada pelo painel
 const conversas = new Map();
@@ -234,7 +241,9 @@ function rodandoNaSessao(sessionId) {
 }
 
 async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [], aoCriarSessao }) {
-    const modoValido = MODOS.includes(modo) ? modo : 'default';
+    const chat = ehChat(cwd);
+    // Chat não tem permissões para escolher: o modo é sempre o padrão
+    const modoValido = !chat && MODOS.includes(modo) ? modo : 'default';
 
     // Já existe processo vivo para esta conversa: a mensagem entra na fila dele
     const viva = sessao && vivaNaSessao(sessao);
@@ -249,7 +258,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
         // Modelo e esforço escolhidos no painel valem a partir desta mensagem
         if (modelo && modelo !== viva.modelo) { await viva.q.setModel(modelo); viva.modelo = modelo; }
         if (esforco && esforco !== viva.esforco) { await viva.q.applyFlagSettings({ effortLevel: esforco }); viva.esforco = esforco; }
-        if (modoValido !== viva.modo) {
+        if (viva.tipo !== 'chat' && modoValido !== viva.modo) {
             if (modoValido === 'bypassPermissions' && !viva.podeIgnorar) {
                 throw new Error('"Sem permissões" só vale numa conversa iniciada nesse modo. Escolha outro modo ou comece uma conversa nova.');
             }
@@ -268,11 +277,24 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
     const { query } = await carregaSdk();
     const conversa = {
         chave: novaChave(), cwd, sessionId: sessao || null, projeto: pastaDoProjeto(cwd), texto: String(texto).slice(0, 3000),
-        status: 'rodando', vivo: true, pendentes: new Map(), erro: null, inicio: new Date().toISOString(), fim: null,
+        status: 'rodando', vivo: true, pendentes: new Map(), tarefasBg: [], tarefasFim: new Set(), erro: null, inicio: new Date().toISOString(), fim: null,
         ultimoUso: Date.now(), fila: criaFila(), q: null, modo: modoValido, podeIgnorar: modoValido === 'bypassPermissions',
-        modelo: modelo || null, esforco: esforco || null,
+        modelo: modelo || null, esforco: esforco || null, tipo: chat ? 'chat' : 'codigo',
     };
-    const opcoes = {
+    const opcoes = chat ? {
+        cwd,
+        resume: sessao || undefined,
+        model: modelo || undefined,
+        effort: esforco || undefined,
+        permissionMode: 'default',
+        // Nada de CLAUDE.md, hooks, agentes ou skills, nenhuma ferramenta nativa e nenhum servidor MCP
+        settingSources: [],
+        tools: [],
+        mcpServers: {},
+        strictMcpConfig: true,
+        systemPrompt: INSTRUCAO_CHAT,
+        canUseTool: async () => ({ behavior: 'deny', message: 'Esta conversa não tem ferramentas.' }),
+    } : {
         cwd,
         resume: sessao || undefined,
         model: modelo || undefined,
@@ -304,6 +326,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
                     if (aoCriarSessao) aoCriarSessao(conversa.projeto, conversa.sessionId);
                 }
                 conversa.ultimoUso = Date.now();
+                if (mensagem.type === 'system') registraTarefas(conversa, mensagem);
                 if (mensagem.type === 'result') {
                     // Fim de um turno: o processo continua vivo, esperando a próxima mensagem
                     conversa.status = conversa.status === 'parando' ? 'interrompida' : 'ociosa';
@@ -319,6 +342,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
             conversa.erro = e.message;
         } finally {
             conversa.vivo = false;
+            conversa.tarefasBg = [];
             conversa.fim = new Date().toISOString();
             conversa.fila.close();
             conversa.pendentes.forEach(p => p.resolve({ behavior: 'deny', message: 'Conversa encerrada.' }));
@@ -358,6 +382,28 @@ function responder(idPendente, { decisao, respostas, mensagem, textoEditado }) {
     return false;
 }
 
+// Tarefas em segundo plano: o SDK manda a lista inteira a cada mudança e um aviso quando uma termina
+function registraTarefas(conversa, m) {
+    if (m.subtype === 'background_tasks_changed') {
+        const antes = new Map(conversa.tarefasBg.map(t => [t.id, t]));
+        conversa.tarefasBg = (m.tasks || []).filter(t => !t.ambient).map(t => ({
+            id: t.task_id, tipo: t.task_type, agente: t.subagent_type || null, descricao: String(t.description || '').slice(0, 200),
+            inicio: (antes.get(t.task_id) || {}).inicio || Date.now(),
+        }));
+    } else if (m.subtype === 'task_notification') {
+        if (m.skip_transcript) return;
+        conversa.tarefasFim.add(m.task_id + ':' + (m.run_id || ''));
+    }
+}
+
+// Para uma tarefa em segundo plano, sem interromper a conversa
+async function pararTarefa(chave, id) {
+    const conversa = conversas.get(chave);
+    if (!conversa || !conversa.vivo || !conversa.tarefasBg.some(t => t.id === id)) return false;
+    try { await conversa.q.stopTask(id); } catch (e) { return false; }
+    return true;
+}
+
 // Interrompe a resposta em andamento; o processo continua vivo para a próxima mensagem
 async function parar(chave) {
     const conversa = conversas.get(chave);
@@ -370,7 +416,7 @@ async function parar(chave) {
 // Troca o modo de permissão; vale na hora se a resposta estiver em andamento
 async function trocaModo(chave, modo) {
     const conversa = conversas.get(chave);
-    if (!conversa || !conversa.vivo || !MODOS.includes(modo)) return false;
+    if (!conversa || !conversa.vivo || conversa.tipo === 'chat' || !MODOS.includes(modo)) return false;
     if (modo === 'bypassPermissions' && !conversa.podeIgnorar) {
         throw new Error('"Sem permissões" só vale numa conversa iniciada nesse modo.');
     }
@@ -385,7 +431,7 @@ function fechaOciosas(minutos = MINUTOS_OCIOSA) {
     for (const c of conversas.values()) {
         if (!c.vivo || (c.status !== 'ociosa' && c.status !== 'interrompida')) continue;
         if (Date.now() - c.ultimoUso < minutos * 60 * 1000) continue;
-        if (c.pendentes.size || temAgentesRodando(c.projeto, c.sessionId)) continue;
+        if (c.pendentes.size || c.tarefasBg.length || temAgentesRodando(c.projeto, c.sessionId)) continue;
         c.fila.close();
         fechadas.push(c.chave);
     }
@@ -488,7 +534,8 @@ function estado() {
     for (const [chave, c] of conversas) if (!c.vivo && c.fim && Date.parse(c.fim) < limite) conversas.delete(chave);
     return [...conversas.values()].map(c => ({
         chave: c.chave, sessionId: c.sessionId, projeto: c.projeto, cwd: c.cwd, status: c.status, vivo: c.vivo,
-        erro: c.erro, inicio: c.inicio, fim: c.fim, texto: c.texto, modo: c.modo, modelo: c.modelo,
+        erro: c.erro, inicio: c.inicio, fim: c.fim, texto: c.texto, modo: c.modo, modelo: c.modelo, tipo: c.tipo,
+        tarefasBg: c.tarefasBg, tarefasFim: c.tarefasFim.size,
         pendentes: [...c.pendentes.values()].map(p => ({
             id: p.id, tipo: p.tipo, ferramenta: p.ferramenta, titulo: p.titulo, descricao: p.descricao,
             podeSempre: p.podeSempre, resumo: resumoEntrada(p.ferramenta, p.entrada),
@@ -506,4 +553,4 @@ function agentesRodandoNa(chave) {
     return !!(c && c.sessionId && temAgentesRodando(c.projeto, c.sessionId));
 }
 
-module.exports = { agentesRodandoNa, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, configura, enviar, responder, parar, trocaModo, fechaOciosas, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };
+module.exports = { CHAT_DIR, ehChat, agentesRodandoNa, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, configura, enviar, responder, parar, pararTarefa, trocaModo, fechaOciosas, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };

@@ -340,6 +340,12 @@ function mostraErro(texto) {
 }
 // A página pede para aparecer (clique numa notificação com a janela escondida)
 ipcMain.on('painel:mostrar', (ev) => { if (janela && ev.sender === janela.webContents) mostraJanela(); });
+// Seletor de pasta do Windows para a modal de nova conversa; devolve o caminho ou null se cancelar
+ipcMain.handle('painel:escolher-pasta', async (ev) => {
+    if (!janela || ev.sender !== janela.webContents) return null;
+    const r = await dialog.showOpenDialog(janela, { title: 'Escolher a pasta do projeto', properties: ['openDirectory', 'createDirectory'] });
+    return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+});
 
 // ---------- Ícone do Red Code: estrela de raios vermelha (desenhada em código) ----------
 // Raios em cápsula saindo do centro, com comprimentos irregulares; 4x4 amostras por pixel (bordas lisas)

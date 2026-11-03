@@ -503,6 +503,18 @@ button.grafo-linha:hover { background: var(--folha); }
 .opcao-worktree small { display: block; color: var(--grafite); font-size: 11.5px; margin-top: 2px; }
 .ajuste-plano { width: 100%; box-sizing: border-box; margin: 4px 0 8px; background: var(--folha); color: var(--tinta); border: 1px solid var(--linha); border-radius: 8px; padding: 8px; font: inherit; resize: vertical; }
 .chip-terminal[aria-pressed="true"] { border-color: var(--voce); color: var(--voce); }
+.tarefas-bg { max-width: 1000px; box-sizing: border-box; margin: 0 0 8px; border: 1px solid var(--linha); border-radius: 10px; background: var(--folha); padding: 8px 12px; font-size: 13px; }
+.tarefas-bg .cab-tarefas { display: flex; align-items: center; gap: 6px; width: 100%; color: var(--tinta); font-size: 13px; text-align: left; }
+.tarefas-bg .cab-tarefas .seta { color: var(--grafite); font-size: 10px; transition: transform .15s; }
+.tarefas-bg.recolhido .cab-tarefas .seta { transform: rotate(-90deg); }
+.tarefas-bg.recolhido .lista-tarefas { display: none; }
+.tarefas-bg .linha-tarefa { display: flex; align-items: center; gap: 10px; padding: 6px 2px 0; color: var(--tinta); }
+.tarefas-bg .ico-tarefa { width: 18px; text-align: center; color: var(--grafite); font-family: var(--estreita), monospace; }
+.tarefas-bg .nome-tarefa { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tarefas-bg .tempo-tarefa { color: var(--grafite); font-size: 12px; white-space: nowrap; }
+.tarefas-bg .parar-tarefa { width: 14px; height: 14px; border-radius: 3px; background: var(--tinta); opacity: .85; flex: none; }
+.tarefas-bg .parar-tarefa:hover { opacity: 1; background: var(--voce); }
+.tarefas-bg .fim-tarefas { color: var(--grafite); }
 .compositor { border-top: 1px solid var(--linha); background: var(--papel); padding: 10px 28px 14px; }
 .caixa-mensagem { border: 1px solid var(--linha); border-radius: 10px; background: var(--realce); padding: 8px 10px; box-shadow: var(--sombra); max-width: 1000px; }
 .caixa-mensagem:focus-within { border-color: var(--modelo); }
@@ -924,6 +936,81 @@ body.iniciando-conversa #mensagem { opacity: .6; }
     .acoes, .lista-plana { margin-left: 0; }
     .item { grid-template-columns: 1fr; gap: 2px; } .hora { text-align: left; }
 }
+
+/* ---------- Minimalista ---------- */
+:root { --linha: #342528; --sombra: none; }
+body { font-size: 13.5px; }
+.layout { grid-template-columns: 252px minmax(0, 1fr); }
+body.lateral-aberta .layout { grid-template-columns: 252px minmax(0, 1fr) 330px; }
+.lateral { display: none; }
+body.lateral-aberta .lateral { display: block; }
+.sessoes { border-right-color: transparent; background: var(--folha); }
+.marca { padding: 20px 18px 10px; }
+.marca-acoes #btnNotificar, .marca-acoes #btnAjuda { opacity: 0; transition: opacity .15s; }
+.marca:hover .marca-acoes #btnNotificar, .marca:hover .marca-acoes #btnAjuda { opacity: 1; }
+.atalhos-lateral, .resumo-status { display: none; }
+.busca { border-color: transparent; background: var(--realce); }
+.busca:focus { border-color: var(--linha); outline: none; }
+.abas { background: none; border: 0; padding: 0; margin-bottom: 8px; gap: 2px; }
+.abas button { flex: none; padding: 3px 8px; }
+.abas button[aria-pressed="true"] { background: none; box-shadow: none; color: var(--tinta); font-weight: 600; }
+.projeto { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 14px 18px 4px; font: 500 12.5px var(--sans); color: var(--grafite); }
+.projeto:hover { color: var(--tinta); }
+.projeto .seta { font-size: 9px; opacity: .7; }
+.projeto .contagem { display: none; }
+.sessao.parte { position: relative; padding-left: 30px; }
+.sessao.parte::before { content: "\2514"; position: absolute; left: 17px; top: 6px; color: var(--grafite); opacity: .5; }
+.sessao { padding: 7px 14px 7px 15px; border-left-width: 2px; }
+.sessao[aria-current="true"] { background: var(--realce); border-left-color: var(--voce); }
+.sessao:hover { background: var(--realce); }
+.sessao .info-item, .sessao .barra-contexto, .sessao.estado-respondeu .linha-selo { display: none; }
+.sessao .linha-selo { margin-top: 2px; font-size: 12px; color: var(--grafite); }
+.topo-sessao .destaques, .topo-sessao .digital, .topo-sessao .numeros { display: none; }
+body.ver-detalhes .topo-sessao .destaques, body.ver-detalhes .topo-sessao .digital, body.ver-detalhes .topo-sessao .numeros { display: revert; }
+body.ver-detalhes .topo-sessao .destaques { display: grid; }
+body.ver-detalhes .topo-sessao .numeros { display: flex; }
+.topo-sessao .situacao { color: var(--grafite); font-size: 12px; }
+.compositor { border-top: 0; padding-top: 6px; }
+.caixa-mensagem { border-color: var(--linha); background: var(--folha); }
+.barra-caixa { border-top: 0; padding-top: 2px; }
+#chipContexto, #chipTempo { display: none; }
+.chip-barra { background: none; border-color: transparent; }
+.chip-barra:hover { color: var(--tinta); }
+.botoes-cantos { position: fixed; top: 10px; right: 14px; z-index: 30; display: flex; gap: 2px; }
+.botoes-cantos button { width: 26px; height: 26px; border-radius: 6px; color: var(--grafite); font-size: 14px; line-height: 1; opacity: .6; }
+.botoes-cantos button:hover, .botoes-cantos button[aria-pressed="true"] { opacity: 1; color: var(--tinta); background: var(--realce); }
+/* Modal de nova conversa: a coluna não pode crescer além da caixa, e a janela fica acima do cartão de uso (z 40) */
+.ajuda { z-index: 60; }
+.caixa.nova { grid-template-columns: minmax(0, 1fr); width: min(620px, 92vw); max-height: 92vh; overflow-y: auto; }
+.caixa.nova select, .caixa.nova input:not([type="checkbox"]), .caixa.nova textarea { width: 100%; min-width: 0; }
+.caixa.nova .duas-colunas { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); }
+/* Animações que faltavam. :where() mantém a especificidade em zero: quem já declara transition continua valendo */
+:where(button, summary, select, input, textarea, .sessao, .caixa-mensagem, .traco) { transition: background-color .15s ease, color .15s ease, border-color .15s ease, opacity .15s ease, box-shadow .15s ease; }
+:where(.projeto .seta, .cab-tarefas .seta) { transition: transform .15s ease; }
+body.lateral-aberta .lateral { animation: entrar-direita .26s var(--entrada); }
+body.anima-detalhes .topo-sessao .destaques, body.anima-detalhes .topo-sessao .digital, body.anima-detalhes .topo-sessao .numeros { animation: surgir .26s var(--entrada); }
+.tarefas-bg:not([hidden]) { animation: surgir .24s var(--entrada); }
+#painelGit:not([hidden]) { animation: fundo-entra .2s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+.linha-pasta { display: flex; gap: 8px; align-items: center; }
+.linha-pasta input { flex: 1; }
+.linha-pasta .botao { white-space: nowrap; }
+/* Alternador Chat | Código */
+.marca { align-items: center; position: relative; }
+.marca strong { white-space: nowrap; }
+.marca-acoes { position: absolute; left: 92px; top: 50%; transform: translateY(-50%); display: flex; gap: 4px; align-items: center; }
+#btnAjuda { font-size: 0; }
+#btnAjuda kbd { font-size: 11px; }
+.alternador { display: flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--papel); }
+.alternador button { width: 32px; height: 26px; border-radius: 7px; color: var(--grafite); display: grid; place-items: center; }
+.alternador button:hover { color: var(--tinta); }
+.alternador button[aria-pressed="true"] { background: var(--realce); color: var(--tinta); }
+#notaChat { display: none; }
+#janelaNova.modo-chat #notaChat { display: block; }
+#janelaNova.modo-chat #notaCodigo, #janelaNova.modo-chat #rotuloProjeto, #janelaNova.modo-chat #rotuloOutraPasta, #janelaNova.modo-chat #rotuloWorktree, #janelaNova.modo-chat #btnEnfileirar { display: none !important; }
+body.sessao-chat #btnTerminal, body.sessao-chat .seletor-modo, body.sessao-chat #chipBranch, body.sessao-chat [data-aba-lateral="git"], body.sessao-chat [data-voltar] { display: none !important; }
 </style>
 </head>
 <body>
@@ -931,7 +1018,11 @@ body.iniciando-conversa #mensagem { opacity: .6; }
     <nav class="sessoes" aria-label="Sessões">
         <div class="marca"><strong>Red Code</strong>
             <span class="marca-acoes"><button id="btnNotificar" title="Avisar no Windows quando uma conversa terminar ou fizer uma pergunta" aria-pressed="false">🔕</button>
-            <button id="btnAjuda" title="Atalhos de teclado">Atalhos <kbd>?</kbd></button></span></div>
+            <button id="btnAjuda" title="Atalhos de teclado">Atalhos <kbd>?</kbd></button></span>
+            <div class="alternador" role="group" aria-label="Modo do app">
+                <button type="button" id="btnModoChat" aria-pressed="false" title="Chat: conversa comum, sem código nem arquivos" aria-label="Chat"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg></button>
+                <button type="button" id="btnModoCodigo" aria-pressed="true" title="Código: conversas dentro de um projeto, com arquivos e terminal" aria-label="Código"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5 2 8l3.5 3.5M10.5 4.5 14 8l-3.5 3.5"/></svg></button>
+            </div></div>
         <button class="botao principal nova-conversa" id="btnNova">Nova conversa</button>
         <input class="busca" id="filtro" type="search" placeholder="Procurar sessão ou projeto" aria-label="Procurar sessão">
         <div class="atalhos-lateral"><button type="button" id="btnBuscaGlobal" title="Procurar um texto ou arquivo em todas as conversas (Ctrl + Shift + F)">⌕ Buscar em tudo</button><button type="button" id="btnResumoDia" title="O que cada conversa fez hoje">☀ Resumo do dia</button></div>
@@ -962,6 +1053,7 @@ body.iniciando-conversa #mensagem { opacity: .6; }
         </section>
         <div class="compositor" id="compositor">
             <div id="pendentes"></div>
+            <div class="tarefas-bg" id="tarefasBg" hidden></div>
             <div class="situacao-chat" id="situacaoChat" hidden></div>
             <form class="caixa-mensagem" id="formMensagem">
                 <div class="anexos" id="anexos" hidden></div>
@@ -1007,6 +1099,10 @@ body.iniciando-conversa #mensagem { opacity: .6; }
         </section>
     </aside>
     <section class="uso-plano" id="usoPlano" aria-label="Limites de uso do plano" hidden></section>
+</div>
+<div class="botoes-cantos">
+    <button type="button" id="btnDetalhes" aria-pressed="false" title="Mostrar ou esconder os detalhes da conversa (modelo, saúde, números)" aria-label="Detalhes da conversa">ⓘ</button>
+    <button type="button" id="btnLateral" aria-pressed="false" title="Mostrar ou esconder o painel de agentes e Git" aria-label="Painel lateral">▥</button>
 </div>
 <div class="recado" id="recado" role="status" aria-live="polite"></div>
 <div class="ajuda" id="janelaBusca" hidden>
@@ -1103,11 +1199,11 @@ body.iniciando-conversa #mensagem { opacity: .6; }
 <div class="ajuda" id="janelaNova" hidden>
     <form class="caixa nova" id="formNova" role="dialog" aria-modal="true" aria-labelledby="tituloNova">
         <h2 id="tituloNova">Nova conversa</h2>
-        <label>Projeto
+        <label id="rotuloProjeto">Projeto
             <select id="novaProjeto"></select>
         </label>
         <label id="rotuloOutraPasta" hidden>Pasta do projeto
-            <input id="novaPasta" placeholder="C:\ProjetosGit\outro-projeto">
+            <span class="linha-pasta"><input id="novaPasta" placeholder="Escolha a pasta ou cole o caminho"><button type="button" class="botao" id="btnEscolherPasta" hidden>Escolher…</button></span>
         </label>
         <label class="opcao-worktree" id="rotuloWorktree" hidden><input type="checkbox" id="novaWorktree">
             <span>Trabalhar numa cópia isolada (worktree git)<small>Para rodar ao mesmo tempo que outra conversa no mesmo projeto. Vai para um branch painel/… criado a partir do último commit: o que não foi commitado no projeto não vai junto. As regras, skills e hooks da pasta .claude são copiados (e anotados no .git/info/exclude do repositório, que vale também para o projeto principal). Outros arquivos não versionados (ex.: configuração do banco local) não vão. Juntar ao principal fica com você.</small></span></label>
@@ -1132,7 +1228,8 @@ body.iniciando-conversa #mensagem { opacity: .6; }
             <textarea id="novaMensagem" rows="8" required placeholder="O que você quer que o Claude faça?"></textarea>
             <div class="sugestao-modelo" id="sugestaoModelo" hidden></div>
         </label>
-        <p class="nota">A conversa roda na pasta escolhida e segue as regras dela (CLAUDE.md, skills e agentes do projeto). "Sem projeto" usa só as suas regras globais. Modelo e esforço podem ser trocados depois, pelo chip do campo de mensagem.</p>
+        <p class="nota" id="notaChat">Conversa comum, como no app do Claude: sem acesso a arquivos, terminal ou ferramentas. Para mexer em código, use o modo Código (ícone &lt;/&gt; no topo da barra lateral).</p>
+        <p class="nota" id="notaCodigo">A conversa roda na pasta escolhida e segue as regras dela (CLAUDE.md, skills e agentes do projeto). "Sem projeto" usa só as suas regras globais. Modelo e esforço podem ser trocados depois, pelo chip do campo de mensagem.</p>
         <div class="linha-envio">
             <button type="button" class="botao" id="btnCancelarNova">Cancelar</button>
             <button class="botao" type="button" id="btnEnfileirar" title="Roda depois, um pedido de cada vez (aba Fila nas Configurações)">Enfileirar</button>
@@ -1909,7 +2006,7 @@ function carregaXterm() {
     xtermCarregado = script('/vendor/xterm.js').then(() => script('/vendor/addon-fit.js'));
     return xtermCarregado;
 }
-function pastaDaConversa() { return (ultimosDados && ultimosDados.cwd) || ''; }
+function pastaDaConversa() { return sessaoEhChat() ? '' : (ultimosDados && ultimosDados.cwd) || ''; }
 async function mostraTerminal(pasta, chave, opcoes) {
     pasta = pasta || pastaDaConversa();
     if (!pasta) return recado('Abra uma conversa para usar o terminal na pasta dela.');
@@ -2368,6 +2465,42 @@ function blocoCadeia(c) {
     return html;
 }
 
+// Grupo da lista: a pasta do projeto. Worktrees entram no projeto de origem; rascunhos do app ficam juntos
+function grupoDoProjeto(s) {
+    const cwd = String(s.cwd || '').replace(/\//g, '\\');
+    if (!cwd) return { id: s.projeto, nome: nomeProjetoBonito(s.nomeProjeto || s.projeto) };
+    if (/\\scratch-workspaces\\/i.test(cwd) || s.nomeProjeto === 'rascunho do app') return { id: 'rascunhos', nome: 'Este computador' };
+    const raiz = cwd.split(/\\\.claude\\worktrees\\/i)[0].replace(/\\+$/, '');
+    return { id: raiz.toLowerCase(), nome: raiz.split('\\').pop() || raiz };
+}
+
+// Modo do app: Chat (conversa comum) ou Código. Quem decide se uma sessão é Chat é o servidor (chatProjeto)
+let modoApp = 'codigo';
+try { modoApp = localStorage.getItem('painelModo') === 'chat' ? 'chat' : 'codigo'; } catch (e) { /* sem armazenamento */ }
+const ehChatChave = (chave) => !!chave && !!dadosPainel.chatProjeto && String(chave).toLowerCase().startsWith(dadosPainel.chatProjeto.toLowerCase() + '/');
+const sessaoEhChat = () => ehChatChave(sessaoAtual) || !!(iniciando && iniciando.tipo === 'chat');
+function aplicaModo(modo) {
+    modoApp = modo;
+    document.body.classList.toggle('modo-chat', modo === 'chat');
+    document.getElementById('btnModoChat').setAttribute('aria-pressed', String(modo === 'chat'));
+    document.getElementById('btnModoCodigo').setAttribute('aria-pressed', String(modo === 'codigo'));
+    // A janela secundária não grava: o armazenamento é compartilhado com a principal
+    if (!JANELA_SECUNDARIA) { try { localStorage.setItem('painelModo', modo); } catch (e) { /* sem armazenamento */ } }
+}
+aplicaModo(modoApp);
+for (const [id, modo] of [['btnModoChat', 'chat'], ['btnModoCodigo', 'codigo']]) {
+    document.getElementById(id).addEventListener('click', () => {
+        if (modoApp === modo) return;
+        aplicaModo(modo);
+        // Trocou pelo botão com uma conversa do outro modo aberta: limpa a tela, e a lista abre a mais recente do novo modo
+        if (sessaoAtual && ehChatChave(sessaoAtual) !== (modo === 'chat')) {
+            sessaoAtual = null; ultimosDados = null; ultimoJson = '';
+            document.getElementById('principal').innerHTML = '<div class="corpo vazio">Escolha uma sessão para acompanhar.</div>';
+        }
+        carregaSessoes();
+    });
+}
+
 function faixaData(ms) {
     const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     if (ms >= hoje.getTime()) return 'Hoje';
@@ -2389,14 +2522,15 @@ async function carregaSessoes() {
     if (!JANELA_SECUNDARIA) verificaAvisos(sessoes);
     const filtro = document.getElementById('filtro').value.toLowerCase();
     const arquivada = (s) => dadosPainel.arquivadas.includes(chaveDe(s));
+    const doModo = (s) => !!s.chat === (modoApp === 'chat');
     // Resumo no topo: quantas conversas em cada estado (clique leva para a aba Ativas)
     const contagem = { trabalhando: 0, agente: 0, pergunta: 0, respondeu: 0 };
-    sessoes.filter(s => !arquivada(s)).forEach(s => { const c = situacaoItem(s).classe; if (c in contagem) contagem[c]++; });
+    sessoes.filter(s => doModo(s) && !arquivada(s)).forEach(s => { const c = situacaoItem(s).classe; if (c in contagem) contagem[c]++; });
     const rotulos = { trabalhando: ['●', 'trabalhando'], agente: ['◆', 'com agente'], pergunta: ['?', 'pergunta', 'perguntas'], respondeu: ['✓', 'respondeu', 'responderam'] };
     document.getElementById('resumoStatus').innerHTML = Object.entries(contagem).filter(([, n]) => n).map(([c, n]) =>
         `<button class="${c}" data-ir-ativas title="Ver as conversas ativas"><b>${rotulos[c][0]}</b>${n} ${n > 1 && rotulos[c][2] ? rotulos[c][2] : rotulos[c][1]}</button>`).join('');
     const casa = (s) => !filtro || (nomeExibido(s, 1) + ' ' + s.titulo + ' ' + s.nomeProjeto).toLowerCase().includes(filtro);
-    let base = sessoes.filter(s => (abaSessoes === 'arquivadas' ? arquivada(s) : !arquivada(s)) && casa(s));
+    let base = sessoes.filter(s => doModo(s) && (abaSessoes === 'arquivadas' ? arquivada(s) : !arquivada(s)) && casa(s));
     if (abaSessoes === 'ativas') base = base.filter(s => s.ativa || s.pergunta || (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000));
 
     const cadeias = montaCadeias(base).sort((a, b) => b.atualizado - a.atualizado);
@@ -2413,14 +2547,14 @@ async function carregaSessoes() {
     if (precisam.length) secoes.push({ id: 'precisam', titulo: 'Precisam de você', classe: 'precisam', cadeias: precisam });
     const favoritas = abaSessoes === 'todas' || abaSessoes === 'ativas' ? pega(favoritaCadeia) : [];
     if (favoritas.length) secoes.push({ id: 'favoritas', titulo: 'Fixadas', classe: 'favoritas', cadeias: favoritas });
-    // Demais conversas por data da última atividade, como no app do Claude
-    const porData = new Map();
+    // Demais conversas por projeto; o projeto com atividade mais recente vem primeiro
+    const porProjeto = new Map();
     for (const c of pega(() => true)) {
-        const faixa = faixaData(c.atualizado);
-        if (!porData.has(faixa)) porData.set(faixa, []);
-        porData.get(faixa).push(c);
+        const { id, nome } = modoApp === 'chat' ? { id: 'd:' + faixaData(c.atualizado), nome: faixaData(c.atualizado) } : grupoDoProjeto(c.membros[c.membros.length - 1]);
+        if (!porProjeto.has(id)) porProjeto.set(id, { titulo: nome, cadeias: [] });
+        porProjeto.get(id).cadeias.push(c);
     }
-    for (const [faixa, lista] of porData) secoes.push({ id: 'd:' + faixa, titulo: faixa, cadeias: lista });
+    for (const [id, { titulo, cadeias: lista }] of porProjeto) secoes.push({ id: 'p:' + id, titulo, cadeias: lista });
 
     sessoesVisiveis = secoes.flatMap(sec => sec.cadeias.flatMap(c => partesAbertas(c) ? [...c.membros].reverse() : [c.membros[c.membros.length - 1]]));
     let html = '';
@@ -2433,11 +2567,19 @@ async function carregaSessoes() {
     }
     const vazios = { ativas: 'Nenhuma conversa ativa agora.', favoritas: 'Nenhuma favorita. Use a estrela ☆ numa conversa.', arquivadas: 'Nada arquivado.', todas: 'Nenhuma conversa encontrada.' };
     document.getElementById('listaSessoes').innerHTML = html || `<div class="vazio" style="padding:20px 18px">${vazios[abaSessoes]}</div>`;
+    // Janela secundária: a sessão abriu antes de saber qual é a pasta do Chat; acerta o modo e redesenha a lista
+    if (sessaoAtual && ehChatChave(sessaoAtual) !== (modoApp === 'chat')) { aplicaModo(ehChatChave(sessaoAtual) ? 'chat' : 'codigo'); return carregaSessoes(); }
+    if (grupoRecemAberto) {
+        const cab = [...document.querySelectorAll('#listaSessoes .projeto')].find(b => b.dataset.grupo === grupoRecemAberto);
+        for (let el = cab && cab.nextElementSibling; el && !el.classList.contains('projeto'); el = el.nextElementSibling) el.classList.add('entrou');
+        grupoRecemAberto = null;
+    }
     if (!sessaoAtual && sessoesVisiveis[0]) abreSessao(chaveDe(sessoesVisiveis[0]));
 }
 
+let grupoRecemAberto = null;
 function alternaGrupo(id) {
-    if (gruposFechados.has(id)) gruposFechados.delete(id); else gruposFechados.add(id);
+    if (gruposFechados.has(id)) { gruposFechados.delete(id); grupoRecemAberto = id; } else gruposFechados.add(id);
     try { localStorage.setItem('painelGruposFechados', JSON.stringify([...gruposFechados])); } catch (e) { /* sem armazenamento */ }
     carregaSessoes();
 }
@@ -2512,6 +2654,7 @@ async function abreSessao(chave, { daNova = false } = {}) {
     }
     sessaoAtual = chave;
     ultimoJson = '';
+    if (ehChatChave(chave) !== (modoApp === 'chat')) { aplicaModo(ehChatChave(chave) ? 'chat' : 'codigo'); carregaSessoes(); }
     document.querySelectorAll('.sessao').forEach(e => e.setAttribute('aria-current', String(e.dataset.chave === chave)));
     const barra = setTimeout(() => principalEl.classList.add('carregando-sessao'), 150);
     try {
@@ -3598,7 +3741,7 @@ document.getElementById('mensagem').addEventListener('input', () => {
                 .map(m => ({ grupo: 'Modelos de pedido', nome: m.nome, faz: () => { insereNoCampo(m.texto); ajustaAlturaCaixa(); } }));
             const editar = !termo || semAcento('editar modelos de pedido').includes(termo) ? [{ grupo: 'Modelos de pedido', nome: 'Editar modelos…', faz: () => abreModelos() }] : [];
             mostraSugestoes([...acoes, ...mods, ...editar, ...comandos].slice(0, 90), '/', 0);
-        } else if (arroba && ultimosDados && ultimosDados.cwd) {
+        } else if (arroba && ultimosDados && ultimosDados.cwd && !sessaoEhChat()) {
             const resposta = await fetch(`/api/arquivos?cwd=${encodeURIComponent(ultimosDados.cwd)}&q=${encodeURIComponent(arroba[1])}`);
             const lista = resposta.ok ? (await resposta.json()).map(p => ({ nome: p, descricao: '' })) : [];
             mostraSugestoes(lista, '@', ate.length - arroba[1].length - 1);
@@ -3902,7 +4045,7 @@ document.getElementById('principal').addEventListener('click', (ev) => {
     iniciando = null; chaveNova = null;
     document.body.classList.remove('iniciando-conversa');
     desenhaCompositor();
-    if (b.dataset.iniciando === 'tentar') abreNovaConversa({ mensagem: i.texto, cwd: i.cwd, modelo: i.modelo, esforco: i.esforco });
+    if (b.dataset.iniciando === 'tentar') abreNovaConversa({ mensagem: i.texto, cwd: i.cwd, modelo: i.modelo, esforco: i.esforco, tipo: i.tipo });
     if (sessaoAtual) atualizaSessao(true); else document.getElementById('principal').innerHTML = '<div class="corpo vazio">Escolha uma sessão para acompanhar.</div>';
 });
 const dispensados = new Set();
@@ -3992,10 +4135,54 @@ function cartaoPendente(p) {
     </div>`;
 }
 
+// Painel "Tarefas em segundo plano": as que estão rodando (com botão de parar) e quantas já terminaram
+let tarefasBgRecolhido = false;
+function tempoTarefa(inicio) {
+    const s = Math.max(0, Math.round((Date.now() - inicio) / 1000));
+    return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
+}
+function desenhaTarefasBg(conversa) {
+    const caixa = document.getElementById('tarefasBg');
+    const rodando = (conversa && conversa.tarefasBg) || [];
+    const finalizadas = (conversa && conversa.tarefasFim) || 0;
+    if (!rodando.length && !finalizadas) { caixa.hidden = true; return; }
+    const html = `
+        <button type="button" class="cab-tarefas" data-tarefas="alternar" aria-expanded="${!tarefasBgRecolhido}">Tarefas em segundo plano <span class="seta">▼</span></button>
+        <div class="lista-tarefas">${rodando.map(t => `
+            <div class="linha-tarefa">
+                <span class="ico-tarefa">${t.agente || t.tipo === 'local_agent' ? '◇' : '&gt;_'}</span>
+                <span class="nome-tarefa" title="${esc(t.descricao)}">${esc(t.descricao || t.tipo)}</span>
+                <span class="tempo-tarefa" data-inicio="${Number(t.inicio) || 0}"></span>
+                <button type="button" class="parar-tarefa" data-tarefas="parar" data-id="${esc(t.id)}" title="Parar esta tarefa" aria-label="Parar esta tarefa"></button>
+            </div>`).join('')}
+            <div class="linha-tarefa fim-tarefas"><span class="ico-tarefa">◇</span><span>Finalizadas: ${finalizadas}</span></div>
+        </div>`;
+    caixa.classList.toggle('recolhido', tarefasBgRecolhido);
+    caixa.hidden = false;
+    if (caixa.dataset.html !== html) { caixa.dataset.html = html; caixa.innerHTML = html; }
+    // O cronômetro muda a cada segundo, então atualiza só o texto e não refaz os botões
+    caixa.querySelectorAll('.tempo-tarefa').forEach(el => { el.textContent = tempoTarefa(Number(el.dataset.inicio)); });
+}
+document.getElementById('tarefasBg').addEventListener('click', async (ev) => {
+    const alvo = ev.target.closest('[data-tarefas]');
+    if (!alvo) return;
+    if (alvo.dataset.tarefas === 'alternar') {
+        tarefasBgRecolhido = !tarefasBgRecolhido;
+        document.getElementById('tarefasBg').classList.toggle('recolhido', tarefasBgRecolhido);
+        return;
+    }
+    const conversa = conversaRelevante();
+    if (!conversa) return;
+    try { await api('/api/chat/parar-tarefa', { chave: conversa.chave, id: alvo.dataset.id }); recado('Parando a tarefa…'); } catch (e) { recado(e.message); }
+    atualizaChat();
+});
+
 function desenhaCompositor() {
+    document.body.classList.toggle('sessao-chat', sessaoEhChat());
     const conversa = conversaRelevante();
     const d = ultimosDados;
     const pendentes = conversa ? conversa.pendentes : [];
+    desenhaTarefasBg(conversa);
     const rodando = conversa && (conversa.status === 'rodando' || conversa.status === 'parando');
     // Conversa grande e parada: oferece continuar numa conversa nova, atrelada a esta
     const saude = d ? avaliaSaude(d) : null;
@@ -4399,9 +4586,12 @@ document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !docum
 const janelaNova = document.getElementById('janelaNova');
 
 let origemNova = null;
+let tipoNova = 'codigo';
 
-async function abreNovaConversa({ mensagem = '', cwd = '', modelo = '', esforco = '', origem = null } = {}) {
+async function abreNovaConversa({ mensagem = '', cwd = '', modelo = '', esforco = '', origem = null, tipo = modoApp } = {}) {
     origemNova = origem;
+    tipoNova = tipo === 'chat' ? 'chat' : 'codigo';
+    janelaNova.classList.toggle('modo-chat', tipoNova === 'chat');
     document.getElementById('tituloNova').textContent = origem ? 'Continuar em conversa nova' : 'Nova conversa';
     const aviso = document.getElementById('avisoVinculo');
     aviso.hidden = !origem;
@@ -4411,7 +4601,7 @@ async function abreNovaConversa({ mensagem = '', cwd = '', modelo = '', esforco 
     // Agrupado: com conversas, outras pastas da raiz, fora de projeto e "Outra pasta…"
     const grupos = new Map();
     for (const p of projetos) { const g = p.grupo || 'Projetos'; if (!grupos.has(g)) grupos.set(g, []); grupos.get(g).push(p); }
-    seletor.innerHTML = [...grupos].map(([g, lista]) => `<optgroup label="${esc(g)}">${lista.map(p => `<option value="${esc(p.cwd)}">${p.semProjeto ? 'Sem projeto (sua pasta de usuário)' : `${esc(p.nome)} (${esc(p.cwd)})`}</option>`).join('')}</optgroup>`).join('')
+    seletor.innerHTML = [...grupos].map(([g, lista]) => `<optgroup label="${esc(g)}">${lista.map(p => `<option value="${esc(p.cwd)}">${p.semProjeto ? 'Sem pasta específica (conversa livre)' : `${esc(p.nome)} (${esc(p.cwd)})`}</option>`).join('')}</optgroup>`).join('')
         + '<optgroup label="Escolher"><option value="__outra">Outra pasta…</option></optgroup>';
     const atual = cwd || (ultimosDados && ultimosDados.cwd) || '';
     const existe = projetos.some(p => p.cwd.toLowerCase() === atual.toLowerCase());
@@ -4432,7 +4622,8 @@ function continuarEmNova() {
     const modelos = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
     abreNovaConversa({
         mensagem: resumoParaNovaConversa(ultimosDados),
-        cwd: ultimosDados.cwd,
+        tipo: sessaoEhChat() ? 'chat' : 'codigo',
+        cwd: sessaoEhChat() ? '' : ultimosDados.cwd,
         modelo: modelos.includes(ultimosDados.modelo) ? ultimosDados.modelo : '',
         esforco: modelos.includes(ultimosDados.modelo) && ['low', 'medium', 'high'].includes(ultimosDados.esforco) ? ultimosDados.esforco : '',
         origem: sessaoAtual,
@@ -4448,18 +4639,29 @@ document.getElementById('btnCancelarNova').addEventListener('click', () => { jan
 janelaNova.addEventListener('click', (ev) => { if (ev.target === janelaNova) janelaNova.hidden = true; });
 // A opção de worktree só aparece se a pasta escolhida for um repositório git
 async function confereWorktree() {
-    const v = document.getElementById('novaProjeto').value;
+    const v = tipoNova === 'chat' ? '' : document.getElementById('novaProjeto').value;
     const rot = document.getElementById('rotuloWorktree');
     document.getElementById('novaWorktree').checked = false;
     rot.hidden = true;
     if (!v || v === '__outra') return;
     try { const r = await (await fetch('/api/worktree/repo?cwd=' + encodeURIComponent(v), { headers: { 'X-Painel': '1' } })).json(); rot.hidden = !r.repo; } catch (e) { /* sem git */ }
 }
+// No app desktop, "Outra pasta…" abre o seletor de pastas do Windows (no navegador, só o campo de texto)
+const btnEscolherPasta = document.getElementById('btnEscolherPasta');
+btnEscolherPasta.hidden = !(window.painelDesktop && window.painelDesktop.escolherPasta);
+async function escolhePasta() {
+    const pasta = await window.painelDesktop.escolherPasta();
+    if (pasta) document.getElementById('novaPasta').value = pasta;
+    return pasta;
+}
+btnEscolherPasta.addEventListener('click', escolhePasta);
 document.getElementById('novaProjeto').addEventListener('change', (ev) => {
+    if (ev.target.value === '__outra' && !btnEscolherPasta.hidden && !document.getElementById('novaPasta').value) escolhePasta();
     document.getElementById('rotuloOutraPasta').hidden = ev.target.value !== '__outra';
     confereWorktree();
 });
 document.getElementById('btnEnfileirar').addEventListener('click', async () => {
+    if (tipoNova === 'chat') return;
     const escolhido = document.getElementById('novaProjeto').value;
     const cwd = escolhido === '__outra' ? document.getElementById('novaPasta').value.trim() : escolhido;
     try {
@@ -4471,14 +4673,14 @@ document.getElementById('btnEnfileirar').addEventListener('click', async () => {
 document.getElementById('formNova').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const escolhido = document.getElementById('novaProjeto').value;
-    let cwd = escolhido === '__outra' ? document.getElementById('novaPasta').value.trim() : escolhido;
+    let cwd = tipoNova === 'chat' ? '' : escolhido === '__outra' ? document.getElementById('novaPasta').value.trim() : escolhido;
     const botao = ev.target.querySelector('[type="submit"]');
     if (botao.disabled) return;
     const rotulo = botao.textContent;
     botao.disabled = true; botao.classList.add('ocupado');
     botao.textContent = 'Iniciando…';
     try {
-        if (document.getElementById('novaWorktree').checked && !document.getElementById('rotuloWorktree').hidden) {
+        if (tipoNova !== 'chat' && document.getElementById('novaWorktree').checked && !document.getElementById('rotuloWorktree').hidden) {
             botao.textContent = 'Criando a cópia isolada…';
             const nome = document.getElementById('novaMensagem').value.trim().split(/\s+/).slice(0, 5).join(' ') || 'conversa';
             const wt = await api('/api/worktree/criar', { cwd, nome });
@@ -4487,6 +4689,7 @@ document.getElementById('formNova').addEventListener('submit', async (ev) => {
         }
         const resposta = await api('/api/chat/enviar', {
             cwd,
+            tipo: tipoNova === 'chat' ? 'chat' : undefined,
             texto: document.getElementById('novaMensagem').value,
             modelo: document.getElementById('novaModelo').value,
             esforco: document.getElementById('novaEsforco').value,
@@ -4495,7 +4698,7 @@ document.getElementById('formNova').addEventListener('submit', async (ev) => {
         chaveNova = resposta.chave;
         janelaNova.hidden = true;
         if (sessaoAtual) guardaRascunho(sessaoAtual);
-        iniciando = { chave: resposta.chave, texto: document.getElementById('novaMensagem').value, cwd, modelo: document.getElementById('novaModelo').value, esforco: document.getElementById('novaEsforco').value, inicio: Date.now(), erro: null };
+        iniciando = { tipo: tipoNova, chave: resposta.chave, texto: document.getElementById('novaMensagem').value, cwd, modelo: document.getElementById('novaModelo').value, esforco: document.getElementById('novaEsforco').value, inicio: Date.now(), erro: null };
         mostraIniciando();
         atualizaChat();
     } catch (e) {
@@ -4522,6 +4725,27 @@ carregaSessoes();
 setInterval(carregaSessoes, 5000);
 setInterval(() => atualizaSessao(false), 2000);
 setInterval(atualizaChat, 1000);
+
+// Visual minimalista: detalhes da conversa e painel lateral começam escondidos; a escolha fica guardada
+(function () {
+    const alternancias = [['btnDetalhes', 'ver-detalhes', 'painelVerDetalhes'], ['btnLateral', 'lateral-aberta', 'painelLateralAberta']];
+    for (const [id, classe, chave] of alternancias) {
+        const botao = document.getElementById(id);
+        const aplica = (ligado) => { document.body.classList.toggle(classe, ligado); botao.setAttribute('aria-pressed', String(ligado)); };
+        let guardado = false;
+        try { guardado = localStorage.getItem(chave) === '1'; } catch (e) { /* sem armazenamento */ }
+        aplica(guardado);
+        botao.addEventListener('click', () => {
+            const ligado = !document.body.classList.contains(classe);
+            aplica(ligado);
+            if (ligado && classe === 'ver-detalhes') {
+                document.body.classList.add('anima-detalhes');
+                setTimeout(() => document.body.classList.remove('anima-detalhes'), 400);
+            }
+            try { localStorage.setItem(chave, ligado ? '1' : '0'); } catch (e) { /* sem armazenamento */ }
+        });
+    }
+})();
 </script>
 </body>
 </html>

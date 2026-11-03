@@ -16,6 +16,8 @@ const integracoes = require('./integracoes');
 const automacao = require('./automacao');
 const gitScm = require('./git-scm');
 const chat = require('./chat');
+// Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
+const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
 const cacheComandos = new Map();
 const cacheUso = { dados: null, em: 0, pedido: null };
 
@@ -622,7 +624,7 @@ function listaSessoes() {
             const situacao = situacaoSessao(estado, stat.mtimeMs);
             const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
             sessoes.push({
-                projeto: pasta, nomeProjeto: nomeProjeto(pasta), id: nome.replace('.jsonl', ''),
+                projeto: pasta, nomeProjeto: nomeProjeto(pasta), id: nome.replace('.jsonl', ''), chat: pasta.toLowerCase() === PASTA_CHAT,
                 titulo: estado.titulo || (pedidos[0] && corta(pedidos[0].texto, 80)) || '(sem título)',
                 modelo: estado.modelo, atualizado: stat.mtimeMs, contexto: estado.contexto,
                 compactacoes: estado.compactacoes.length, inicio: estado.inicio, cwd: estado.cwd,
@@ -771,6 +773,8 @@ function preparaAnexos(anexos) {
 // Pastas que o painel aceita consultar (só as de conversas conhecidas)
 function pastaConhecida(cwd) {
     if (!cwd) return false;
+    // A pasta das conversas Chat não é projeto: git, editor, terminal, fila e agendadas não valem nela
+    if (chat.ehChat(cwd)) return false;
     const alvo = path.resolve(cwd).toLowerCase();
     return listaSessoes().some(s => s.cwd && path.resolve(s.cwd).toLowerCase() === alvo);
 }
@@ -883,7 +887,7 @@ function listaProjetos() {
     for (const s of listaSessoes()) {
         if (s.cwd && !vistos.has(s.cwd.toLowerCase())) vistos.set(s.cwd.toLowerCase(), { cwd: s.cwd, nome: s.nomeProjeto, ultimo: s.atualizado });
     }
-    const lista = [...vistos.values()].filter(p => p.nome !== 'rascunho do app' && fs.existsSync(p.cwd)).map(p => ({ ...p, grupo: 'Com conversas' }));
+    const lista = [...vistos.values()].filter(p => p.nome !== 'rascunho do app' && !chat.ehChat(p.cwd) && fs.existsSync(p.cwd)).map(p => ({ ...p, grupo: 'Com conversas' }));
     // Outras pastas da raiz de projetos (ainda sem conversa)
     const raizProjetos = process.env.PAINEL_RAIZ_PROJETOS || 'C:\\ProjetosGit';
     try {
@@ -895,8 +899,10 @@ function listaProjetos() {
     } catch (e) { /* raiz não existe */ }
     // Sem projeto: a pasta do usuário, sem as regras (CLAUDE.md) de nenhum projeto
     const casa = os.homedir();
-    if (!lista.some(p => p.cwd.toLowerCase() === casa.toLowerCase())) lista.push({ cwd: casa, nome: 'Sem projeto', grupo: 'Fora de projeto', semProjeto: true });
-    return lista;
+    // Sempre oferecida, mesmo que a pasta do usuário já tenha conversas (aí ela sai de "Com conversas")
+    const semCasa = lista.filter(p => p.cwd.toLowerCase() !== casa.toLowerCase());
+    semCasa.push({ cwd: casa, nome: 'Sem projeto', grupo: 'Fora de projeto', semProjeto: true });
+    return semCasa;
 }
 
 // Código do servidor mudou depois que ele subiu? (a página avisa e oferece o reinício seguro)
@@ -1004,7 +1010,7 @@ async function rotaChat(req, res, url) {
     if (url.pathname === '/api/versao' && req.method === 'GET') return responde(res, 200, versaoServidor());
     if (url.pathname === '/api/chat/estado' && req.method === 'GET') return responde(res, 200, chat.estado());
     if (url.pathname === '/api/projetos' && req.method === 'GET') return responde(res, 200, listaProjetos());
-    if (url.pathname === '/api/dados' && req.method === 'GET') return responde(res, 200, leDados());
+    if (url.pathname === '/api/dados' && req.method === 'GET') return responde(res, 200, { ...leDados(), chatProjeto: chat.pastaDoProjeto(chat.CHAT_DIR) });
     if (url.pathname.startsWith('/api/git/')) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
         const cwd = req.method === 'GET' ? url.searchParams.get('cwd') : null;
@@ -1209,6 +1215,8 @@ async function rotaChat(req, res, url) {
         const texto = String(corpo.texto || '').trim();
         if (!texto) return responde(res, 400, { erro: 'Escreva uma mensagem.' });
         let cwd = corpo.cwd;
+        // Conversa Chat nova: o servidor escolhe a pasta; numa sessão existente vale só o cwd do transcript
+        if (!corpo.sessao && corpo.tipo === 'chat') { fs.mkdirSync(chat.CHAT_DIR, { recursive: true }); cwd = chat.CHAT_DIR; }
         if (corpo.sessao) {
             if (/[\\/]|\.\./.test(corpo.projeto + corpo.sessao)) return responde(res, 400, { erro: 'sessão inválida' });
             const detalhe = detalheSessao(corpo.projeto, corpo.sessao);
@@ -1236,6 +1244,10 @@ async function rotaChat(req, res, url) {
             dados.vinculos[`${projeto}/${sessionId}`] = origem;
             gravaDados(dados);
         } : null;
+        // Chat não tem como ler arquivos: só imagens
+        if (chat.ehChat(cwd) && (Array.isArray(corpo.anexos) ? corpo.anexos : []).some(a => !/^image\/(png|jpeg|gif|webp)$/.test(a.tipo))) {
+            return responde(res, 400, { erro: 'Na conversa de Chat só dá para anexar imagens. Cole o texto do arquivo na mensagem ou use o modo Código.' });
+        }
         const { imagens: imagensAnexas, textoExtra } = preparaAnexos(corpo.anexos);
         const conversa = await chat.enviar({
             cwd, sessao: corpo.sessao, texto: texto + textoExtra, modelo: corpo.modelo, esforco: corpo.esforco,
@@ -1285,6 +1297,9 @@ async function rotaChat(req, res, url) {
     }
     if (url.pathname === '/api/chat/parar') {
         return (await chat.parar(corpo.chave)) ? responde(res, 200, { ok: true }) : responde(res, 404, { erro: 'Nada rodando para parar.' });
+    }
+    if (url.pathname === '/api/chat/parar-tarefa') {
+        return (await chat.pararTarefa(corpo.chave, corpo.id)) ? responde(res, 200, { ok: true }) : responde(res, 404, { erro: 'Esta tarefa já terminou.' });
     }
     return responde(res, 404, { erro: 'não encontrado' });
 }
