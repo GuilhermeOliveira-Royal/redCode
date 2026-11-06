@@ -121,6 +121,11 @@ function nodeDoSistema() {
     const candidatos = [process.env.PAINEL_NODE, 'C:\\Program Files\\nodejs\\node.exe'].filter(Boolean);
     return candidatos.find(c => fs.existsSync(c)) || 'node';
 }
+// Env do perfil ativo (perfis.js); com erro, sobe no padrão (igual a antes dos perfis)
+function envDoPerfilAtivo() {
+    try { const perfis = require(path.join(PASTA, 'perfis.js')); return perfis.envDoPerfil(perfis.le().ativo); }
+    catch (e) { return {}; }
+}
 function sobeServidor() {
     // Log num descritor de arquivo (não por pipe): se o app morrer, o servidor não morre de EPIPE
     const log = fs.openSync(ARQ_LOG, 'a');
@@ -128,7 +133,8 @@ function sobeServidor() {
     servidor = spawn(nodeDoSistema(), [path.join(PASTA, 'server.js')], {
         cwd: PASTA,
         env: {
-            ...process.env, PAINEL_PORTA: String(PORTA), PAINEL_LANCADOR: '1', PAINEL_DESKTOP: '1',
+            // Perfil ativo (conta do Claude + identidade do Git): calculado a cada subida, então trocar de perfil = subir de novo
+            ...process.env, ...envDoPerfilAtivo(), PAINEL_PORTA: String(PORTA), PAINEL_LANCADOR: '1', PAINEL_DESKTOP: '1',
             ...(EMPACOTADO ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
             ...(controleNavegador ? { PAINEL_NAVEGADOR_PORTA: String(controleNavegador.porta), PAINEL_NAVEGADOR_TOKEN: controleNavegador.token } : {}),
         },
@@ -284,7 +290,11 @@ function protegeJanela(win) {
     const dentro = (url) => url === ORIGEM || url.startsWith(ORIGEM + '/');
     // Fora da janela abre só: sites (navegador padrão) e arquivos no VS Code (vscode://file/...);
     // outros comandos do esquema vscode: (clonar repositório, extensões) ficam bloqueados
-    const abreFora = (url) => { if (/^https?:\/\//i.test(url) || /^vscode:\/\/file\//i.test(url)) shell.openExternal(url); };
+    // Links web vão para o navegador escolhido em Configurações; vscode://file/ continua indo para o VS Code
+    const abreFora = (url) => {
+        if (/^vscode:\/\/file\//i.test(url)) return shell.openExternal(url);
+        if (/^https?:\/\//i.test(url)) abreNoNavegadorEscolhido(url);
+    };
     win.webContents.on('will-navigate', (ev, url) => {
         if (dentro(url)) return;
         ev.preventDefault();
@@ -345,6 +355,19 @@ ipcMain.handle('painel:escolher-pasta', async (ev) => {
     if (!janela || ev.sender !== janela.webContents) return null;
     const r = await dialog.showOpenDialog(janela, { title: 'Escolher a pasta do projeto', properties: ['openDirectory', 'createDirectory'] });
     return r.canceled || !r.filePaths[0] ? null : r.filePaths[0];
+});
+// Configurações › Sistema e Desenvolvedor (só a janela principal pode pedir)
+ipcMain.handle('painel:inicio-windows', (ev) => (janela && ev.sender === janela.webContents) ? iniciaComWindows() : false);
+ipcMain.handle('painel:define-inicio-windows', (ev, ligar) => {
+    if (!janela || ev.sender !== janela.webContents) return iniciaComWindows();
+    // Mesma chamada do item da bandeja (sobe escondido, com o caminho do main.js)
+    app.setLoginItemSettings({ openAtLogin: !!ligar, path: process.execPath, args: ARGS_LOGIN });
+    atualizaBandeja();
+    return iniciaComWindows();
+});
+ipcMain.handle('painel:abrir-logs', async (ev) => {
+    if (!janela || ev.sender !== janela.webContents) return false;
+    return (await shell.openPath(PASTA_DADOS)) === '';
 });
 
 // ---------- Ícone do Red Code: estrela de raios vermelha (desenhada em código) ----------
@@ -428,6 +451,43 @@ function garanteAtalhoMenuIniciar() {
 }
 
 // ---------- Bandeja ----------
+// Navegador escolhido em Configurações (fica no dados.json do servidor); "padrao" = o do Windows
+const ARQ_DADOS_SERVIDOR = path.join(process.env.PAINEL_DADOS || PASTA, 'dados.json');
+let prefNavegador = { valor: 'padrao', em: 0 };
+function lePrefNavegador() {
+    if (Date.now() - prefNavegador.em < 5000) return prefNavegador.valor;
+    let valor = 'padrao';
+    try { valor = JSON.parse(fs.readFileSync(ARQ_DADOS_SERVIDOR, 'utf8')).navegador || 'padrao'; } catch (e) { /* sem dados: o do Windows */ }
+    prefNavegador = { valor, em: Date.now() };
+    return valor;
+}
+const EXE_NAVEGADOR = { edge: 'msedge.exe', chrome: 'chrome.exe', firefox: 'firefox.exe' };
+// Caminho do navegador pelo registro (App Paths), sem shell
+function caminhoNavegador(exe) {
+    const chaves = ['HKCU', 'HKLM'].map(h => `${h}\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\${exe}`);
+    return new Promise((resolve) => {
+        const tenta = (i) => {
+            if (i >= chaves.length) return resolve(null);
+            execFile('reg', ['query', chaves[i], '/ve'], { windowsHide: true, timeout: 5000 }, (erro, saida) => {
+                const m = !erro && /REG_(?:EXPAND_)?SZ\s+(.+)/.exec(String(saida));
+                const caminho = m && m[1].trim().replace(/^"|"$/g, '');
+                if (caminho && fs.existsSync(caminho)) return resolve(caminho);
+                tenta(i + 1);
+            });
+        };
+        tenta(0);
+    });
+}
+async function abreNoNavegadorEscolhido(url) {
+    const exe = EXE_NAVEGADOR[lePrefNavegador()];
+    const caminho = exe ? await caminhoNavegador(exe) : null;
+    if (!caminho) return shell.openExternal(url);
+    try {
+        const p = spawn(caminho, [url], { detached: true, stdio: 'ignore' });
+        p.on('error', () => shell.openExternal(url));
+        p.unref();
+    } catch (e) { shell.openExternal(url); }
+}
 function iniciaComWindows() {
     return app.getLoginItemSettings({ path: process.execPath, args: ARGS_LOGIN }).openAtLogin;
 }

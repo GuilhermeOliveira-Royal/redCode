@@ -204,6 +204,8 @@ const INSTRUCAO_RED_CODE = [
     'Quando as instruções pedirem para abrir uma janela externa do PowerShell acompanhando um arquivo de andamento (Start-Process ... Get-Content -Wait), NÃO abra a janela externa.',
     'Em vez disso, logo depois de iniciar o processo, rode: Write-Output "ACOMPANHAR: <caminho absoluto do arquivo>" (caminho completo, sem aspas dentro).',
     'O Red Code vê essa linha e abre sozinho uma aba de terminal acompanhando o arquivo ao vivo.',
+    'Quando você criar ou salvar imagens para o usuário ver (exemplos, prints, gráficos, mockups), cite cada uma na resposta final em markdown de imagem com o caminho absoluto, uma por linha: ![descrição curta](C:\\caminho\\arquivo.png).',
+    'O Red Code mostra essas imagens dentro da própria resposta; não se limite a dizer em que pasta salvou.',
 ].join(' ');
 
 function criaPermissao(conversa) {
@@ -240,13 +242,23 @@ function rodandoNaSessao(sessionId) {
     return c && (c.status === 'rodando' || c.status === 'parando') ? c : null;
 }
 
-async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [], aoCriarSessao }) {
+async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [], aoCriarSessao, env = null, assinatura = '' }) {
     const chat = ehChat(cwd);
     // Chat não tem permissões para escolher: o modo é sempre o padrão
     const modoValido = !chat && MODOS.includes(modo) ? modo : 'default';
 
     // Já existe processo vivo para esta conversa: a mensagem entra na fila dele
-    const viva = sessao && vivaNaSessao(sessao);
+    let viva = sessao && vivaNaSessao(sessao);
+    // Conta/identidade da conversa mudou e ela está ociosa: fecha e retoma com o env novo (rodando: mantém até terminar)
+    if (viva && viva.trocando) throw new Error('A conversa está trocando a conta/identidade. Tente de novo em alguns segundos.');
+    if (viva && (viva.assinatura || '') !== (assinatura || '') && viva.status !== 'rodando' && viva.status !== 'parando' && !viva.pendentes.size && !(viva.tarefasBg || []).length) {
+        viva.trocando = true;
+        try { viva.fila.close(); } catch (e) { /* já fechada */ }
+        const t0 = Date.now();
+        while (viva.vivo && Date.now() - t0 < 10000) await new Promise(r => setTimeout(r, 200));
+        if (viva.vivo) { viva.trocando = false; throw new Error('A conversa ainda está fechando para trocar a conta/identidade. Tente de novo em alguns segundos.'); }
+        viva = null;
+    }
     if (viva && (viva.status === 'rodando' || viva.status === 'parando')) {
         // Comentário no meio do trabalho: entra no próximo passo; o modo não muda agora
         viva.fila.push(mensagemUsuario(texto, imagens, 'next'));
@@ -280,6 +292,8 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
         status: 'rodando', vivo: true, pendentes: new Map(), tarefasBg: [], tarefasFim: new Set(), erro: null, inicio: new Date().toISOString(), fim: null,
         ultimoUso: Date.now(), fila: criaFila(), q: null, modo: modoValido, podeIgnorar: modoValido === 'bypassPermissions',
         modelo: modelo || null, esforco: esforco || null, tipo: chat ? 'chat' : 'codigo',
+        // Conta/identidade desta conversa (env próprio) e a pasta da conta do Claude que ela usa
+        assinatura: assinatura || '', contaDir: require('./perfis').contaDoEnv(env || process.env),
     };
     const opcoes = chat ? {
         cwd,
@@ -315,6 +329,7 @@ async function enviar({ cwd, sessao, texto, modelo, esforco, modo, imagens = [],
         canUseTool: criaPermissao(conversa),
     };
     conversa.fila.push(mensagemUsuario(texto, imagens));
+    if (env) opcoes.env = env;
     conversa.q = query({ prompt: conversa.fila, options: opcoes });
     conversas.set(conversa.chave, conversa);
 
@@ -442,7 +457,8 @@ setInterval(() => fechaOciosas(), 60 * 1000).unref();
 // Limites de uso do plano (sessão de 5 h, semanal, por modelo). Usa um processo vivo do
 // painel se houver; senão sobe um processo que não recebe mensagem nenhuma (não gasta tokens).
 async function usoDoPlano() {
-    const viva = [...conversas.values()].find(c => c.vivo && c.q);
+    const contaServidor = require('./perfis').contaDoEnv(process.env);
+    const viva = [...conversas.values()].find(c => c.vivo && c.q && (c.contaDir || contaServidor) === contaServidor);
     let q = viva && viva.q, fila = null;
     if (!q) {
         const { query } = await carregaSdk();
@@ -476,7 +492,8 @@ async function usoDoPlano() {
 // Usa um processo vivo do painel na mesma pasta se houver; senão sobe um que não recebe mensagem.
 async function comandosDisponiveis(cwd) {
     const alvo = String(cwd || '').toLowerCase();
-    const viva = [...conversas.values()].find(c => c.vivo && c.q && String(c.cwd).toLowerCase() === alvo);
+    const contaServidor = require('./perfis').contaDoEnv(process.env);
+    const viva = [...conversas.values()].find(c => c.vivo && c.q && String(c.cwd).toLowerCase() === alvo && (c.contaDir || contaServidor) === contaServidor);
     let q = viva && viva.q, fila = null;
     if (!q) {
         const { query } = await carregaSdk();
@@ -493,13 +510,14 @@ async function comandosDisponiveis(cwd) {
     }
 }
 
-async function comProcessoDaSessao(sessionId, cwd, fn) {
+async function comProcessoDaSessao(sessionId, cwd, fn, env) {
     const viva = vivaNaSessao(sessionId);
     let q = viva && viva.q, fila = null;
     if (!q) {
         const { query } = await carregaSdk();
         fila = criaFila();
-        q = query({ prompt: fila, options: { cwd, resume: sessionId, settingSources: ['user', 'project', 'local'], enableFileCheckpointing: true } });
+        // env da conversa: o resume só acha o transcript na conta dela
+        q = query({ prompt: fila, options: { cwd, resume: sessionId, settingSources: ['user', 'project', 'local'], enableFileCheckpointing: true, ...(env ? { env } : {}) } });
     }
     try {
         return await Promise.race([fn(q), new Promise((_, rej) => setTimeout(() => rej(new Error('demorou demais')), 30000))]);
@@ -508,8 +526,8 @@ async function comProcessoDaSessao(sessionId, cwd, fn) {
     }
 }
 // Voltar os arquivos ao estado de uma mensagem sua (simular = só mostra o que mudaria)
-function voltarArquivos(sessionId, cwd, uuid, simular) {
-    return comProcessoDaSessao(sessionId, cwd, (q) => q.rewindFiles(uuid, { dryRun: !!simular }));
+function voltarArquivos(sessionId, cwd, uuid, simular, env) {
+    return comProcessoDaSessao(sessionId, cwd, (q) => q.rewindFiles(uuid, { dryRun: !!simular }), env);
 }
 // Ramificar: copia a conversa até a mensagem escolhida numa sessão nova
 async function ramificar(sessionId, cwd, uuid) {
@@ -517,8 +535,8 @@ async function ramificar(sessionId, cwd, uuid) {
     return sdk.forkSession(sessionId, { dir: cwd, upToMessageId: uuid });
 }
 // Servidores MCP da conversa
-function statusMcp(sessionId, cwd) {
-    return comProcessoDaSessao(sessionId, cwd, (q) => q.mcpServerStatus());
+function statusMcp(sessionId, cwd, env) {
+    return comProcessoDaSessao(sessionId, cwd, (q) => q.mcpServerStatus(), env);
 }
 async function acaoMcp(sessionId, servidor, acao) {
     const viva = vivaNaSessao(sessionId);

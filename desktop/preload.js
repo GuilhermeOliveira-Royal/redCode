@@ -8,4 +8,8 @@ contextBridge.exposeInMainWorld('painelDesktop', {
     mostrar: () => ipcRenderer.send('painel:mostrar'),
     // Abre o seletor de pastas do Windows (null se cancelar)
     escolherPasta: () => ipcRenderer.invoke('painel:escolher-pasta'),
+    // Configurações › Sistema: iniciar com o Windows (ler e gravar) e Desenvolvedor: abrir a pasta dos logs
+    inicioWindows: () => ipcRenderer.invoke('painel:inicio-windows'),
+    defineInicioWindows: (ligar) => ipcRenderer.invoke('painel:define-inicio-windows', !!ligar),
+    abrirLogs: () => ipcRenderer.invoke('painel:abrir-logs'),
 });

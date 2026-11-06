@@ -16,13 +16,21 @@ const integracoes = require('./integracoes');
 const automacao = require('./automacao');
 const gitScm = require('./git-scm');
 const chat = require('./chat');
+const perfis = require('./perfis');
 // Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
 const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
+// Primeiro nome do usuário do Windows (henrique.freitas -> Henrique), para a saudação do Chat
+function nomeUsuario() {
+    const nome = String(os.userInfo().username || '').split(/[._\s-]/)[0];
+    return nome ? nome[0].toUpperCase() + nome.slice(1) : '';
+}
 const cacheComandos = new Map();
 const cacheUso = { dados: null, em: 0, pedido: null };
 
 const PORTA = Number(process.env.PAINEL_PORTA || 4317);
-const RAIZ_PROJETOS = path.join(os.homedir(), '.claude', 'projects');
+// Pasta do Claude do perfil ativo (CLAUDE_CONFIG_DIR vem do perfil; no padrão é ~/.claude)
+const PASTA_CLAUDE = perfis.pastaClaude();
+const RAIZ_PROJETOS = path.join(PASTA_CLAUDE, 'projects');
 const DIAS_LISTADOS = 7;
 const SEGUNDOS_ATIVA = 90;
 const LIMITE_EVENTOS = 400;
@@ -71,6 +79,8 @@ function arquivosCitados(texto, cwd) {
     const candidatos = [];
     for (const m of String(texto).matchAll(/\[([^\]\n]+)\]\(([^)\s]+)\)/g)) candidatos.push({ nome: m[1], caminho: m[2] });
     for (const m of String(texto).matchAll(/`([^`\n]+\.[A-Za-z]{2,5})`/g)) candidatos.push({ nome: null, caminho: m[1] });
+    // Imagem citada com caminho absoluto solto no texto ("salvei em C:\...\exemplo1.png")
+    for (const m of String(texto).matchAll(/(?:^|[\s(:"'])([A-Za-z]:[\\/][^\s`"'<>|*?()]+\.(?:png|jpe?g|gif|webp|svg))(?=$|[\s),.;:!?"'])/gim)) candidatos.push({ nome: null, caminho: m[1] });
     for (const c of candidatos) {
         if (!EXTENSOES_RELATORIO.test(c.caminho.replace(/[#?].*$/, ''))) continue;
         const absoluto = path.resolve(cwd || '.', c.caminho.replace(/^file:\/\/\/?/i, '').replace(/[#?].*$/, ''));
@@ -131,7 +141,64 @@ function estadoVazio() {
         tarefasNotificadas: {},
         // Antes e depois de cada mensagem reescrita pelo Haiku: { hora, original, reescrito }
         reescritas: [],
+        // Custo em US$ por dia local ("AAAA-MM-DD"), somado resposta a resposta
+        custoPorDia: {}, ultimoIdCusto: null, ultimoCustoId: 0, ultimoDiaCusto: null,
     };
+}
+
+// Preço por milhão de tokens: entrada, saída, leitura de cache, gravação de cache 5 min e 1 h
+// (tabela da extensão Claude Code Usage; a primeira chave que o id do modelo contém vence)
+const PRECOS_MODELO = [
+    ['fable-5-1', [10, 50, 0.25, 12.5, 20]], ['fable', [10, 50, 1, 12.5, 20]],
+    ['opus-5-5', [4, 20, 0.2, 5, 8]], ['opus-4-1', [15, 75, 1.5, 18.75, 30]], ['opus-4-2025', [15, 75, 1.5, 18.75, 30]], ['opus', [5, 25, 0.5, 6.25, 10]],
+    ['sonnet-5-5', [2, 10, 0.2, 2.5, 4]], ['sonnet', [3, 15, 0.3, 3.75, 6]],
+    ['haiku', [1, 5, 0.1, 1.25, 2]],
+];
+
+function custoDaResposta(modelo, u) {
+    const achado = PRECOS_MODELO.find(([chave]) => String(modelo).includes(chave));
+    if (!achado) return 0;
+    const [entrada, saida, leitura, grava5, grava1h] = achado[1];
+    const cc = u.cache_creation || {};
+    const uma = cc.ephemeral_1h_input_tokens || 0;
+    const cinco = cc.ephemeral_5m_input_tokens != null ? cc.ephemeral_5m_input_tokens : Math.max(0, (u.cache_creation_input_tokens || 0) - uma);
+    return ((u.input_tokens || 0) * entrada + (u.output_tokens || 0) * saida + (u.cache_read_input_tokens || 0) * leitura + cinco * grava5 + uma * grava1h) / 1e6;
+}
+
+function diaLocal(quando) {
+    const d = quando ? new Date(quando) : new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function somaCusto(estado, r, msg) {
+    if (!msg.usage || !msg.model || msg.model === '<synthetic>' || !r.timestamp) return;
+    const valor = custoDaResposta(msg.model, msg.usage);
+    // A mesma resposta vem em várias linhas (uma por bloco): conta só a última versão dela
+    if (msg.id && msg.id === estado.ultimoIdCusto) {
+        estado.custoPorDia[estado.ultimoDiaCusto] += valor - estado.ultimoCustoId;
+    } else {
+        const dia = diaLocal(r.timestamp);
+        estado.custoPorDia[dia] = (estado.custoPorDia[dia] || 0) + valor;
+        estado.ultimoIdCusto = msg.id || null;
+        estado.ultimoDiaCusto = dia;
+    }
+    estado.ultimoCustoId = valor;
+}
+
+// Custo de hoje da conversa somado ao dos agentes dela (transcripts em <sessão>/subagents)
+function custoHojeSessao(pastaSessao, estado) {
+    const hoje = diaLocal();
+    let total = estado.custoPorDia[hoje] || 0;
+    const pasta = path.join(pastaSessao, 'subagents');
+    if (fs.existsSync(pasta)) {
+        for (const nome of fs.readdirSync(pasta)) {
+            if (!nome.endsWith('.jsonl')) continue;
+            const arquivo = path.join(pasta, nome);
+            if (fs.statSync(arquivo).mtimeMs < new Date(hoje + 'T00:00:00').getTime()) continue;
+            total += leIncremental(arquivo, estadoVazio, processaRegistro).custoPorDia[hoje] || 0;
+        }
+    }
+    return total;
 }
 
 // Primeiras linhas de um texto + total de linhas (para os cartões de código)
@@ -247,7 +314,11 @@ function processaRegistro(estado, r, origem) {
         estado.inicio = estado.inicio || r.timestamp;
         estado.ultimo = r.timestamp;
     }
-    if (r.cwd && !r.isSidechain) estado.cwd = r.cwd;
+    if (r.cwd && !r.isSidechain) {
+        estado.cwd = r.cwd;
+        // Um "cd" no meio da conversa muda o cwd gravado; o resume precisa do que bate com a pasta do .jsonl
+        (estado.cwds = estado.cwds || {})[chat.pastaDoProjeto(r.cwd).toLowerCase()] = r.cwd;
+    }
     if (r.type === 'ai-title') { estado.titulo = r.aiTitle; return; }
     // Modo de permissão em uso: vem gravado nas suas mensagens
     if (r.type === 'user' && r.permissionMode && !r.isSidechain) estado.modo = r.permissionMode;
@@ -408,6 +479,7 @@ function processaRegistro(estado, r, origem) {
             if (estado.turnoEncerrado) estado.fimTurno = r.timestamp;
         }
         if (msg.model !== '<synthetic>') somaTokens(estado, msg.model, msg.usage);
+        somaCusto(estado, r, msg);
         if (modeloValido && msg.usage) {
             const u = msg.usage;
             const tamanho = (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
@@ -606,15 +678,55 @@ function situacaoSessao(estado, mtime) {
     return { ativa, esperando: !ativa && (estado.turnoEncerrado || !!estado.pergunta), agentesRodando };
 }
 
+// ---------- Conta e Git por conversa ----------
+// dados.porConversa["projeto/sessao" minúsculo] = { claude, git, projeto, sessao } (escolha absoluta feita na tela)
+const chaveConversa = (projeto, sessao) => (String(projeto) + '/' + String(sessao)).toLowerCase();
+function entradaDaConversa(projeto, sessao) { return (leDados().porConversa || {})[chaveConversa(projeto, sessao)] || null; }
+const resolveMin = (p) => path.resolve(p).toLowerCase();
+// Pastas projects/ das contas citadas por conversa (sem a do perfil, sem repetir)
+function raizesExtras() {
+    const principal = resolveMin(RAIZ_PROJETOS), vistas = new Set([principal]), lista = [];
+    for (const e of Object.values(leDados().porConversa || {})) {
+        if (!e || !e.claude || !perfis.existeConta(e.claude)) continue;
+        const r = perfis.raizDaConta(e.claude);
+        if (vistas.has(resolveMin(r))) continue;
+        vistas.add(resolveMin(r)); lista.push({ raiz: r, conta: e.claude });
+    }
+    return lista;
+}
+// Onde está o transcript: primeiro na conta escolhida para a conversa, depois na do perfil e nas outras
+function arquivoDaSessao(projeto, id) {
+    const e = entradaDaConversa(projeto, id);
+    const ordem = [];
+    if (e && e.claude && perfis.existeConta(e.claude)) ordem.push(perfis.raizDaConta(e.claude));
+    ordem.push(RAIZ_PROJETOS, ...raizesExtras().map(x => x.raiz));
+    const vistas = new Set();
+    for (const raiz of ordem) {
+        if (vistas.has(resolveMin(raiz))) continue;
+        vistas.add(resolveMin(raiz));
+        const arquivo = path.join(raiz, projeto, id + '.jsonl');
+        if (fs.existsSync(arquivo)) return { arquivo, raiz };
+    }
+    return null;
+}
+// env completo da conversa (o do servidor quando ela não tem escolha própria)
+function envDeConversa(projeto, id) { return perfis.envDaConversa(entradaDaConversa(projeto, id)); }
+function assinaturaDe(entrada) { return entrada ? (entrada.claude || '') + '|' + (entrada.git || '') : ''; }
+
 function listaSessoes() {
     const limite = Date.now() - DIAS_LISTADOS * 24 * 3600 * 1000;
     const sessoes = [];
-    if (!fs.existsSync(RAIZ_PROJETOS)) return sessoes;
-    for (const pasta of fs.readdirSync(RAIZ_PROJETOS)) {
-        const caminhoPasta = path.join(RAIZ_PROJETOS, pasta);
+    const porConversaLista = leDados().porConversa || {};
+    const raizesLista = [{ raiz: RAIZ_PROJETOS, conta: null }, ...raizesExtras()];
+    for (const { raiz: raizLista, conta: contaLista } of raizesLista) {
+    if (!fs.existsSync(raizLista)) continue;
+    for (const pasta of fs.readdirSync(raizLista)) {
+        const caminhoPasta = path.join(raizLista, pasta);
         if (!fs.statSync(caminhoPasta).isDirectory()) continue;
         for (const nome of fs.readdirSync(caminhoPasta)) {
             if (!nome.endsWith('.jsonl')) continue;
+            // Outra conta: só as conversas que foram criadas nela pela tela (as demais continuam escondidas)
+            if (contaLista) { const en = porConversaLista[chaveConversa(pasta, nome.replace('.jsonl', ''))]; if (!en || en.claude !== contaLista) continue; }
             const arquivo = path.join(caminhoPasta, nome);
             const stat = fs.statSync(arquivo);
             if (stat.mtimeMs < limite) continue;
@@ -622,12 +734,15 @@ function listaSessoes() {
             // Agentes em segundo plano só importam em sessões mexidas na última hora
             if (Date.now() - stat.mtimeMs < 3600 * 1000) leSubagentes(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado);
             const situacao = situacaoSessao(estado, stat.mtimeMs);
+            // Conversa trabalhando (aberta ou não): vigia os repositórios dela, para cada comando ser comparado com a versão certa
+            if (situacao.ativa) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
             const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
             sessoes.push({
                 projeto: pasta, nomeProjeto: nomeProjeto(pasta), id: nome.replace('.jsonl', ''), chat: pasta.toLowerCase() === PASTA_CHAT,
                 titulo: estado.titulo || (pedidos[0] && corta(pedidos[0].texto, 80)) || '(sem título)',
                 modelo: estado.modelo, atualizado: stat.mtimeMs, contexto: estado.contexto,
-                compactacoes: estado.compactacoes.length, inicio: estado.inicio, cwd: estado.cwd,
+                compactacoes: estado.compactacoes.length, inicio: estado.inicio, cwd: cwdDaPasta(estado, pasta), custo: estado.custo,
+                custoHoje: stat.mtimeMs >= new Date(diaLocal() + 'T00:00:00').getTime() ? custoHojeSessao(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado) : 0,
                 ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
                 pergunta: !!estado.pergunta, fimTurno: estado.fimTurno,
                 // O que ela está fazendo agora (ferramenta ainda sem resposta), para a lista lateral
@@ -635,32 +750,406 @@ function listaSessoes() {
                     const e = [...estado.eventos].reverse().find(x => x.id && !x.fim);
                     return e ? { tipo: e.tipo, texto: corta(e.tipo === 'edicao' || e.tipo === 'leitura' ? path.basename(String(e.texto)) : e.texto, 60) } : null;
                 })() : null,
+                // Conta e Git escolhidos para esta conversa (null = os do perfil)
+                porConversa: porConversaLista[chaveConversa(pasta, nome.replace('.jsonl', ''))] || null, contaOutra: contaLista,
             });
         }
+    }
     }
     return sessoes.sort((a, b) => b.atualizado - a.atualizado);
 }
 
+// cwd que gera o nome da pasta onde está o .jsonl (é nele que o SDK procura ao retomar)
+function cwdDaPasta(estado, projeto) {
+    return (estado.cwds && estado.cwds[String(projeto).toLowerCase()]) || estado.cwd;
+}
+
+// A conversa editou este arquivo (Edit/Write no transcript)? Libera o editor ao vivo a mostrar o arquivo inteiro
+function editadoNaSessao(projeto, id, abs) {
+    if (!projeto || !id) return false;
+    const d = detalheSessao(String(projeto), String(id));
+    const alvo = String(abs).toLowerCase();
+    if ((arquivosPorComando.get(String(id)) || new Set()).has(alvo)) return true;
+    return !!(d && d.eventos.some(e => e.tipo === 'edicao' && e.texto && path.resolve(String(e.texto)).toLowerCase() === alvo));
+}
+
+// ---------- Arquivos alterados por comando (PowerShell/Bash) ----------
+// No Royal o Edit é bloqueado em PHP/HTML (Latin-1) e o Claude altera por script: o editor ao vivo
+// descobre pelo git e pela hora de modificação o que o comando mudou. Só leitura.
+const retratos = new Map();             // arquivo (minúsculo) -> último conteúdo visto (normalizado como o editor)
+const devolvidosPorSessao = new Map();  // sessao -> Map(arquivo minúsculo -> mtime já devolvido)
+const arquivosPorComando = new Map();   // sessao -> Set(arquivo minúsculo): libera o editor a abrir fora da pasta
+// Pasta dos perfis (agentes/memória de uma conta do Claude): também é bastidor
+const PERFIS_BASTIDOR = perfis.PASTA_PERFIS.toLowerCase() + path.sep;
+const ARQ_BASTIDOR = /[\\/](AppData[\\/]Local[\\/]Temp|scratchpad|\.claude|node_modules|\.git)([\\/]|$)/i;
+const EXT_TEXTO = /\.(php|html?|tpl|inc|js|mjs|cjs|ts|css|scss|less|sql|json|md|txt|xml|ini|ps1|py|bat|cmd)$/i;
+// ---------- Vigia de arquivos: versões reais de cada arquivo, no momento em que mudam no disco ----------
+// Repositórios da conversa aberta ficam vigiados (fs.watch recursivo). Ao começar a vigiar, os arquivos já alterados
+// ganham a primeira versão (o "antes" da próxima mudança); arquivo limpo não precisa: o antes dele é o último commit.
+const historicoArquivos = new Map();   // arquivo (minúsculo) -> { abs, versoes: [{ t, conteudo }] } (últimas 6)
+const vigias = new Map();              // raiz (minúscula) -> { w, uso }
+const LIMITE_VERSAO = 1024 * 1024;
+const ignoraNaVigia = (abs) => ARQ_BASTIDOR.test(abs) || abs.toLowerCase().startsWith(PERFIS_BASTIDOR) || !EXT_TEXTO.test(abs);
+function leVersao(abs) {
+    try {
+        const st = fs.statSync(abs);
+        if (!st.isFile() || st.size > LIMITE_VERSAO) return null;
+        return editorArquivos.ler(path.dirname(abs), path.basename(abs)).conteudo;
+    } catch (e) { return null; }
+}
+function anotaVersao(abs, t, conteudo) {
+    const k = abs.toLowerCase();
+    const reg = historicoArquivos.get(k) || { abs, versoes: [] };
+    const ult = reg.versoes[reg.versoes.length - 1];
+    if (ult && ult.conteudo === conteudo) return;
+    reg.versoes.push({ t, conteudo });
+    if (reg.versoes.length > 6) reg.versoes.shift();
+    historicoArquivos.delete(k); historicoArquivos.set(k, reg);
+    if (historicoArquivos.size > 400) historicoArquivos.delete(historicoArquivos.keys().next().value);
+}
+async function vigiaRepo(raiz) {
+    if (!raiz) return;
+    const k = raiz.toLowerCase();
+    const ja = vigias.get(k);
+    if (ja) { ja.uso = Date.now(); return; }
+    if (vigias.size >= 6) {
+        const [kVelho, velho] = [...vigias].sort((a, b) => a[1].uso - b[1].uso)[0];
+        try { velho.w.close(); } catch (e) { /* já fechado */ }
+        vigias.delete(kVelho);
+    }
+    const pendentes = new Map();
+    let w;
+    try {
+        w = fs.watch(raiz, { recursive: true }, (tipo, nome) => {
+            if (!nome) return;
+            const abs = path.join(raiz, String(nome));
+            if (ignoraNaVigia(abs)) return;
+            // Várias gravações seguidas do mesmo arquivo: guarda só a última (120 ms depois)
+            clearTimeout(pendentes.get(abs));
+            pendentes.set(abs, setTimeout(() => {
+                pendentes.delete(abs);
+                const c = leVersao(abs);
+                if (c !== null) anotaVersao(abs, Date.now(), c);
+            }, 120));
+        });
+    } catch (e) { return; }
+    w.on('error', () => { try { w.close(); } catch (x) { /* já fechado */ } vigias.delete(k); });
+    vigias.set(k, { w, uso: Date.now() });
+    // Foto dos arquivos já alterados agora (t = 0: versão de antes de qualquer comando daqui para a frente)
+    const st = await rodaGit(['-C', raiz, 'status', '--porcelain', '-z', '-uall']);
+    const itens = st ? st.split('\0') : [];
+    for (let i = 0; i < itens.length; i++) {
+        const item = itens[i];
+        if (item.length < 4) continue;
+        if (item[0] === 'R' || item[0] === 'C') i++;
+        if (item[0] === 'D' || item[1] === 'D') continue;
+        const abs = path.resolve(raiz, item.slice(3));
+        if (ignoraNaVigia(abs) || historicoArquivos.has(abs.toLowerCase())) continue;
+        const c = leVersao(abs);
+        if (c !== null) anotaVersao(abs, 0, c);
+    }
+}
+// Repositório sem uso há 30 min: para de vigiar
+setInterval(() => { for (const [k, v] of vigias) if (Date.now() - v.uso > 1800000) { try { v.w.close(); } catch (e) { /* já fechado */ } vigias.delete(k); } }, 60000).unref();
+// Versão do arquivo de logo antes de um instante (undefined = não se sabe)
+function versaoAntesDe(abs, instante) {
+    const reg = historicoArquivos.get(abs.toLowerCase());
+    if (!reg) return undefined;
+    for (let i = reg.versoes.length - 1; i >= 0; i--) if (reg.versoes[i].t < instante) return reg.versoes[i].conteudo;
+    return undefined;
+}
+function guardaRetrato(abs, conteudo) {
+    const k = String(abs).toLowerCase();
+    retratos.delete(k); retratos.set(k, conteudo);
+    if (retratos.size > 300) retratos.delete(retratos.keys().next().value);
+}
+function rodaGit(args, buffer) {
+    return new Promise((resolve) => {
+        execFile('git', args, { timeout: 5000, maxBuffer: 8 * 1024 * 1024, encoding: buffer ? 'buffer' : 'utf8', windowsHide: true }, (erro, saida) => resolve(erro ? null : saida));
+    });
+}
+// Mesma regra do editor: sem BOM, UTF-8 se for válido, senão Windows-1252; CRLF vira LF
+function textoDoBuffer(buf) {
+    if (buf.length >= 3 && buf[0] === 0xEF && buf[1] === 0xBB && buf[2] === 0xBF) buf = buf.subarray(3);
+    const t = editorArquivos.utf8Valido(buf) ? buf.toString('utf8') : editorArquivos.decodifica1252(buf);
+    return t.replace(/\r\n/g, '\n');
+}
+// O que mudou: o bloco entre o começo e o fim iguais
+function trocaDoMeio(antes, depois) {
+    const a = antes.split('\n'), d = depois.split('\n');
+    let i = 0;
+    while (i < a.length && i < d.length && a[i] === d[i]) i++;
+    let j = 0;
+    while (j < a.length - i && j < d.length - i && a[a.length - 1 - j] === d[d.length - 1 - j]) j++;
+    return { antes: a.slice(i, a.length - j).join('\n'), depois: d.slice(i, d.length - j).join('\n') };
+}
+// Diff de linhas (Myers): cada trecho alterado separado, como o git diff. Com o arquivo comparado a uma base antiga
+// (último commit, várias mudanças espalhadas), o bloco único juntava o começo de uma mudança com o fim de outra.
+function trechosDiferentes(antes, depois) {
+    const a = antes.split('\n'), b = depois.split('\n');
+    // Corta o começo e o fim iguais (deixa o diff barato mesmo em arquivo grande)
+    let ini = 0;
+    while (ini < a.length && ini < b.length && a[ini] === b[ini]) ini++;
+    let fa = a.length, fb = b.length;
+    while (fa > ini && fb > ini && a[fa - 1] === b[fb - 1]) { fa--; fb--; }
+    const A = a.slice(ini, fa), B = b.slice(ini, fb), n = A.length, m = B.length, max = n + m;
+    if (!max) return [];
+    // Diferença grande demais para calcular: volta ao bloco único
+    if (max > 20000) return [{ antes: A.join('\n'), depois: B.join('\n') }];
+    const v = new Map([[1, 0]]), rastro = [];
+    let fimD = -1;
+    for (let dd = 0; dd <= max && fimD < 0; dd++) {
+        rastro.push(new Map(v));
+        for (let k = -dd; k <= dd; k += 2) {
+            let x = (k === -dd || (k !== dd && (v.get(k - 1) ?? -1) < (v.get(k + 1) ?? -1))) ? (v.get(k + 1) ?? 0) : (v.get(k - 1) ?? 0) + 1;
+            let y = x - k;
+            while (x < n && y < m && A[x] === B[y]) { x++; y++; }
+            v.set(k, x);
+            if (x >= n && y >= m) { fimD = dd; break; }
+        }
+        if (dd > 4000) return [{ antes: A.join('\n'), depois: B.join('\n') }];
+    }
+    // Refaz o caminho: lista de operações (= igual, - sai, + entra)
+    const ops = [];
+    let x = n, y = m;
+    for (let dd = fimD; dd > 0; dd--) {
+        const vv = rastro[dd], k = x - y;
+        const kAnt = (k === -dd || (k !== dd && (vv.get(k - 1) ?? -1) < (vv.get(k + 1) ?? -1))) ? k + 1 : k - 1;
+        const xAnt = vv.get(kAnt) ?? 0, yAnt = xAnt - kAnt;
+        while (x > xAnt && y > yAnt) { ops.push('='); x--; y--; }
+        ops.push(x === xAnt ? '+' : '-');
+        if (x === xAnt) y--; else x--;
+    }
+    while (x > 0 && y > 0) { ops.push('='); x--; y--; }
+    ops.reverse();
+    // Junta em trechos; trechos separados por até 2 linhas iguais viram um só
+    const trechos = [];
+    let ia = 0, ib = 0, atual = null, iguais = 0;
+    for (const op of ops) {
+        if (op === '=') {
+            if (atual) { iguais++; atual.antes.push(A[ia]); atual.depois.push(B[ib]); if (iguais > 2) { atual.antes.splice(-iguais); atual.depois.splice(-iguais); trechos.push(atual); atual = null; } }
+            ia++; ib++;
+            continue;
+        }
+        if (!atual) atual = { antes: [], depois: [] };
+        iguais = 0;
+        if (op === '-') atual.antes.push(A[ia++]); else atual.depois.push(B[ib++]);
+    }
+    if (atual) { if (iguais) { atual.antes.splice(-iguais); atual.depois.splice(-iguais); } trechos.push(atual); }
+    return trechos.map(t => ({ antes: t.antes.join('\n'), depois: t.depois.join('\n') }));
+}
+async function raizGit(dir) {
+    const s = await rodaGit(['-C', dir, 'rev-parse', '--show-toplevel']);
+    return s ? path.resolve(s.trim()) : null;
+}
+// Ao vivo: o que mudou nos arquivos da conversa desde o começo do comando, versão a versão.
+// visto = { arquivo minúsculo: t da última versão já mostrada }: cada resposta traz só o que veio depois dela.
+async function alteracoesAoVivo(projeto, sessao, id, visto) {
+    const d = detalheSessao(projeto, sessao);
+    if (!d) return null;
+    const e = d.eventos.find(x => x.id === id && x.tipo === 'comando');
+    if (!e || e.bloqueado) return { mudancas: [], terminou: true };
+    const ini = Date.parse(e.hora);
+    const raizes = (d.repos || []).map(r => r.toLowerCase());
+    const mudancas = [];
+    for (const [k, reg] of historicoArquivos) {
+        if (!raizes.some(r => k.startsWith(r + path.sep) || k.startsWith(r + '/'))) continue;
+        const ult = reg.versoes[reg.versoes.length - 1];
+        if (!ult || ult.t < ini || (visto[k] && ult.t <= visto[k])) continue;
+        // Base: a última versão já mostrada; na primeira vez, a de logo antes do comando; sem ela, o commit
+        let antes;
+        if (visto[k]) { const v = [...reg.versoes].reverse().find(x => x.t <= visto[k]); if (v) antes = v.conteudo; }
+        if (antes === undefined) antes = versaoAntesDe(reg.abs, ini);
+        if (antes === undefined) {
+            const r = await raizGit(path.dirname(reg.abs));
+            const buf = r ? await rodaGit(['-C', r, 'show', 'HEAD:' + path.relative(r, reg.abs).replace(/\\/g, '/')], true) : null;
+            antes = buf ? textoDoBuffer(buf) : '';
+        }
+        if (antes === ult.conteudo) continue;
+        if (!arquivosPorComando.has(sessao)) arquivosPorComando.set(sessao, new Set());
+        arquivosPorComando.get(sessao).add(k);
+        if (!antes) { mudancas.push({ arquivo: reg.abs, t: ult.t, codigo: { tipo: 'arquivo', conteudo: trechoCodigo(ult.conteudo) } }); continue; }
+        const trechos = trechosDiferentes(antes, ult.conteudo).filter(t => t.antes !== t.depois).slice(-8);
+        if (trechos.length) mudancas.push({ arquivo: reg.abs, t: ult.t, codigo: { tipo: 'diff', trocas: trechos.map(t => ({ antes: trechoCodigo(t.antes, 40), depois: trechoCodigo(t.depois, 40) })) } });
+    }
+    return { mudancas, terminou: !!e.fim };
+}
+async function alteracoesDoComando(projeto, sessao, id) {
+    const d = detalheSessao(projeto, sessao);
+    if (!d) return null;
+    const e = d.eventos.find(x => x.id === id && x.tipo === 'comando');
+    if (!e || !e.fim || e.bloqueado) return [];
+    const ini = Date.parse(e.hora), fim = Date.parse(e.fim) + 5000;
+    const candidatos = new Set();
+    // a) o que o vigia viu mudar durante o comando (qualquer repositório da conversa)
+    for (const reg of historicoArquivos.values()) if (reg.versoes.some(v => v.t >= ini && v.t <= fim)) candidatos.add(reg.abs);
+    // b) o que o git vê como alterado ou novo, na pasta da conversa e nos repositórios em que ela trabalha
+    const raizes = [...new Set([d.cwd ? await raizGit(d.cwd) : null, ...(d.repos || [])].filter(Boolean).map(r => path.resolve(r)))];
+    for (const raiz of raizes) {
+        const st = await rodaGit(['-C', raiz, 'status', '--porcelain', '-z', '-uall']);
+        const itens = st ? st.split('\0') : [];
+        for (let k = 0; k < itens.length; k++) {
+            const item = itens[k];
+            if (item.length < 4) continue;
+            if (item[0] === 'R' || item[0] === 'C') k++;   // renomeado: o próximo é o nome antigo
+            if (item[0] === 'D' || item[1] === 'D') continue;
+            candidatos.add(path.resolve(raiz, item.slice(3)));
+        }
+    }
+    // c) caminhos absolutos citados no próprio comando (ex.: arquivo de outro clone)
+    const texto = (e.codigo && e.codigo.entrada && e.codigo.entrada.texto) || '';
+    for (const m of texto.matchAll(/[A-Za-z]:[\\/][^'"`\s<>|*?]+?\.[A-Za-z0-9]{1,5}(?=['"`\s;,)]|$)/g)) candidatos.add(path.resolve(m[0]));
+    const achados = [];
+    for (const abs of candidatos) {
+        if (ARQ_BASTIDOR.test(abs) || abs.toLowerCase().startsWith(PERFIS_BASTIDOR) || !EXT_TEXTO.test(abs)) continue;
+        let st;
+        try { st = fs.statSync(abs); } catch (x) { continue; }
+        if (!st.isFile() || st.size > 3 * 1024 * 1024 || st.mtimeMs < ini || st.mtimeMs > fim) continue;
+        achados.push({ abs, mtime: st.mtimeMs });
+    }
+    achados.sort((a, b) => a.mtime - b.mtime);
+    if (!devolvidosPorSessao.has(sessao)) devolvidosPorSessao.set(sessao, new Map());
+    if (!arquivosPorComando.has(sessao)) arquivosPorComando.set(sessao, new Set());
+    const devolvidos = devolvidosPorSessao.get(sessao);
+    const saida = [];
+    for (const { abs, mtime } of achados.slice(-8)) {
+        const k = abs.toLowerCase();
+        if (devolvidos.get(k) === mtime) continue;   // já mostrado (ex.: php -l chamado junto com o script)
+        devolvidos.set(k, mtime);   // marca antes de qualquer await: dois pedidos juntos não repetem o arquivo
+        let atual;
+        try { atual = editorArquivos.ler(path.dirname(abs), path.basename(abs)).conteudo; } catch (x) { continue; }
+        // Antes = como o arquivo estava logo antes de o comando começar (vigia); sem isso, a última foto; sem foto, o commit
+        let antes = versaoAntesDe(abs, ini);
+        if (antes === undefined) antes = retratos.get(k);
+        if (antes === undefined) {
+            // Sem retrato: compara com o último commit (arquivo novo: base vazia)
+            const r = await raizGit(path.dirname(abs));
+            const buf = r ? await rodaGit(['-C', r, 'show', 'HEAD:' + path.relative(r, abs).replace(/\\/g, '/')], true) : null;
+            antes = buf ? textoDoBuffer(buf) : '';
+        }
+        guardaRetrato(abs, atual);
+        if (antes === atual) continue;
+        arquivosPorComando.get(sessao).add(k);
+        if (!antes) { saida.push({ arquivo: abs, codigo: { tipo: 'arquivo', conteudo: trechoCodigo(atual) } }); continue; }
+        // Cada trecho alterado separado (até 8), cada um no seu lugar do arquivo
+        const trechos = trechosDiferentes(antes, atual).filter(t => t.antes !== t.depois).slice(-8);
+        if (!trechos.length) continue;
+        saida.push({ arquivo: abs, codigo: { tipo: 'diff', trocas: trechos.map(t => ({ antes: trechoCodigo(t.antes, 40), depois: trechoCodigo(t.depois, 40) })) } });
+    }
+    return saida;
+}
+
+// ---------- Ícones de arquivo: Catppuccin Perfect Icons (extensão MIT do VS Code), Mocha no escuro e Latte no claro ----------
+let iconesTema = { em: 0 };
+function temaIcones(tema) {
+    if (Date.now() - iconesTema.em > 600000) {
+        iconesTema = { em: Date.now(), dir: null, temas: {} };
+        try {
+            const pasta = path.join(os.homedir(), '.vscode', 'extensions');
+            const dirs = fs.readdirSync(pasta).filter(n => /^thang-nm\.catppuccin-perfect-icons-/i.test(n)).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+            if (dirs.length) iconesTema.dir = path.join(pasta, dirs[dirs.length - 1]);
+        } catch (e) { /* extensão não instalada: o painel usa as etiquetas */ }
+    }
+    if (!iconesTema.dir) return null;
+    const nomeTema = tema === 'claro' ? 'latte' : 'mocha';
+    if (!iconesTema.temas[nomeTema]) {
+        try {
+            const arq = path.join(iconesTema.dir, 'themes', nomeTema, 'theme.json');
+            iconesTema.temas[nomeTema] = { pasta: path.dirname(arq), j: JSON.parse(fs.readFileSync(arq, 'utf8')) };
+        } catch (e) { return null; }
+    }
+    return iconesTema.temas[nomeTema];
+}
+const LINGUAGEM_EXT = { html: 'html', htm: 'html', tpl: 'html', js: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', php: 'php', sql: 'sql', css: 'css', json: 'json', md: 'markdown', ps1: 'powershell', py: 'python', xml: 'xml', yml: 'yaml', yaml: 'yaml', bat: 'bat', sh: 'shellscript' };
+// Mesma ordem do VS Code: nome exato, extensão (da mais longa, ex.: blade.php, para a mais curta), linguagem, genérico
+function iconeDoArquivo(nome, tema, pasta, aberta) {
+    const t = temaIcones(tema);
+    if (!t) return null;
+    const j = t.j, n = String(nome || '').toLowerCase().split(/[\\/]/).pop();
+    let id;
+    if (pasta) id = (aberta ? (j.folderNamesExpanded || {})[n] : (j.folderNames || {})[n]) || (aberta ? j.folderExpanded : j.folder);
+    else {
+        id = (j.fileNames || {})[n];
+        const partes = n.split('.');
+        for (let i = 1; !id && i < partes.length; i++) id = (j.fileExtensions || {})[partes.slice(i).join('.')];
+        if (!id && partes.length > 1) id = (j.languageIds || {})[LINGUAGEM_EXT[partes[partes.length - 1]]];
+        id = id || j.file;
+    }
+    const def = id && j.iconDefinitions && j.iconDefinitions[id];
+    if (!def || !def.iconPath) return null;
+    const arq = path.resolve(t.pasta, def.iconPath);
+    // Só SVG de dentro da pasta da extensão
+    if (!arq.toLowerCase().startsWith(iconesTema.dir.toLowerCase() + path.sep) || !/\.svg$/i.test(arq)) return null;
+    return arq;
+}
+
+// Repositórios em que a conversa trabalhou de fato: raiz git dos arquivos editados e dos caminhos citados nos
+// comandos (no Royal, PHP/HTML só mudam por comando), do mais recente para o mais antigo; o cwd entra por último.
+const raizesGitCache = new Map();
+const reposVistos = new Set();
+function raizGitSync(caminho) {
+    let d = path.resolve(caminho);
+    try { if (!fs.statSync(d).isDirectory()) d = path.dirname(d); } catch (e) { d = path.dirname(d); }
+    const chave = d.toLowerCase();
+    if (raizesGitCache.has(chave)) return raizesGitCache.get(chave);
+    let raiz = null;
+    for (let x = d, i = 0; i < 40; i++) {
+        if (fs.existsSync(path.join(x, '.git'))) { raiz = x; break; }
+        const pai = path.dirname(x);
+        if (pai === x) break;
+        x = pai;
+    }
+    raizesGitCache.set(chave, raiz);
+    return raiz;
+}
+const CAMINHO_EM_COMANDO = /[A-Za-z]:[\\/](?:[^\s"'`<>|*?;&]+)/g;
+function reposDaSessao(estado, cwd) {
+    const vistos = new Map();
+    const anota = (caminho, hora) => {
+        if (!caminho || !path.isAbsolute(caminho) || ARQ_BASTIDOR.test(caminho) || caminho.toLowerCase().startsWith(PERFIS_BASTIDOR)) return;
+        const raiz = raizGitSync(caminho);
+        if (!raiz) return;
+        const k = raiz.toLowerCase();
+        const t = Date.parse(hora) || 0;
+        if (!vistos.has(k) || vistos.get(k).t < t) vistos.set(k, { raiz, t });
+    };
+    for (const e of estado.eventos.slice(-1500)) {
+        if (e.tipo === 'edicao') anota(String(e.texto || ''), e.hora);
+        else if (e.tipo === 'comando') {
+            const c = e.codigo || {};
+            const txt = [c.entrada && c.entrada.texto, e.texto].filter(Boolean).join('\n').slice(0, 4000);
+            for (const m of txt.match(CAMINHO_EM_COMANDO) || []) anota(m.replace(/[),.:]+$/, ''), e.hora);
+        }
+    }
+    const lista = [...vistos.values()].sort((a, b) => b.t - a.t).map(x => x.raiz);
+    const raizCwd = cwd && raizGitSync(cwd);
+    if (raizCwd && !lista.some(r => r.toLowerCase() === raizCwd.toLowerCase())) lista.push(raizCwd);
+    lista.forEach(r => reposVistos.add(r.toLowerCase()));
+    return lista.slice(0, 6);
+}
 function detalheSessao(projeto, id) {
     // Bloqueia caminho fora da pasta de projetos
     if (/[\\/]|\.\./.test(projeto + id)) return null;
-    const arquivo = path.join(RAIZ_PROJETOS, projeto, id + '.jsonl');
-    if (!fs.existsSync(arquivo)) return null;
+    const achado = arquivoDaSessao(projeto, id);
+    if (!achado) return null;
+    const arquivo = achado.arquivo;
     const estado = leIncremental(arquivo, estadoVazio, processaRegistro);
-    leSubagentes(path.join(RAIZ_PROJETOS, projeto, id), estado);
+    leSubagentes(path.join(achado.raiz, projeto, id), estado);
     const stat = fs.statSync(arquivo);
     const situacao = situacaoSessao(estado, stat.mtimeMs);
     const primeiroPedido = estado.eventos.find(e => e.tipo === 'pedido');
     return {
         titulo: estado.titulo || (primeiroPedido && corta(primeiroPedido.texto, 80)), modelo: estado.modelo, esforco: estado.esforco, custo: estado.custo,
-        inicio: estado.inicio, ultimo: estado.ultimo,
+        custoHoje: custoHojeSessao(path.join(achado.raiz, projeto, id), estado),
+        porConversa: entradaDaConversa(projeto, id),
+        inicio: estado.inicio, ultimo: estado.ultimo, repos: (() => { const r = reposDaSessao(estado, cwdDaPasta(estado, projeto)); r.forEach(x => vigiaRepo(x)); return r; })(),
         ativa: situacao.ativa, esperando: situacao.esperando, agentesRodando: situacao.agentesRodando,
         fimTurno: estado.fimTurno, pergunta: estado.pergunta, planoHora: estado.planoHora || null, modo: estado.modo || 'default',
         reescritas: estado.reescritas,
         projeto: nomeProjeto(projeto), plano: estado.plano, tokens: estado.tokens, contagem: estado.contagem,
         contexto: estado.contexto, serieContexto: estado.serieContexto, modelos: estado.modelos,
         trocas: estado.trocas, compactacoes: estado.compactacoes, ttlCacheMin: estado.ttlCacheMin,
-        atualizado: stat.mtimeMs, cwd: estado.cwd, arquivo,
+        atualizado: stat.mtimeMs, cwd: cwdDaPasta(estado, projeto), arquivo,
         agentes: Object.values(estado.agentes).sort((a, b) => String(b.inicio).localeCompare(String(a.inicio))),
         eventos: estado.eventos.slice(-LIMITE_EVENTOS),
     };
@@ -735,7 +1224,7 @@ function requisicaoConfiavel(req) {
 const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
-    const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [] };
+    const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], pastasExtras: [], navegador: 'padrao' };
     try { return { ...vazio, ...JSON.parse(fs.readFileSync(ARQUIVO_DADOS, 'utf8')) }; }
     catch (e) { return vazio; }
 }
@@ -776,6 +1265,7 @@ function pastaConhecida(cwd) {
     // A pasta das conversas Chat não é projeto: git, editor, terminal, fila e agendadas não valem nela
     if (chat.ehChat(cwd)) return false;
     const alvo = path.resolve(cwd).toLowerCase();
+    if (reposVistos.has(alvo)) return true;
     return listaSessoes().some(s => s.cwd && path.resolve(s.cwd).toLowerCase() === alvo);
 }
 
@@ -783,7 +1273,7 @@ function pastaConhecida(cwd) {
 // O painel compara com o que a conversa usou de fato, para ver se a configuração está valendo.
 function configModelos(cwd) {
     const agentes = {};
-    const raizes = [[path.join(os.homedir(), '.claude'), 'seu'], cwd ? [path.join(cwd, '.claude'), 'projeto'] : null].filter(Boolean);
+    const raizes = [[path.join(PASTA_CLAUDE), 'seu'], cwd ? [path.join(cwd, '.claude'), 'projeto'] : null].filter(Boolean);
     for (const [raiz, origem] of raizes) {
         const pasta = path.join(raiz, 'agents');
         if (!fs.existsSync(pasta)) continue;
@@ -801,12 +1291,257 @@ function configModelos(cwd) {
     }
     // Hook que reescreve o pedido com o Haiku (procura nas configurações do usuário e do projeto)
     let hookHaiku = false;
-    const configs = [path.join(os.homedir(), '.claude', 'settings.json'), path.join(os.homedir(), '.claude', 'settings.local.json')];
+    const configs = [path.join(PASTA_CLAUDE, 'settings.json'), path.join(PASTA_CLAUDE, 'settings.local.json')];
     if (cwd) configs.push(path.join(cwd, '.claude', 'settings.json'), path.join(cwd, '.claude', 'settings.local.json'));
     for (const c of configs) {
         try { if (/refine-prompt/.test(JSON.stringify(JSON.parse(fs.readFileSync(c, 'utf8')).hooks || {}))) hookHaiku = true; } catch (e) { /* sem arquivo */ }
     }
     return { agentes, hookHaiku };
+}
+
+// ---------- Agentes (Configurações › Regras e agentes): ler, editar, ativar/desativar, criar e apagar ----------
+// Os .md ficam em ~/.claude/agents (seus) e <projeto>/.claude/agents. Desativar um seu = renomear para .md.desativado
+// (Claude Code só lê *.md). Desativar um do projeto = só para você: "Agent(nome)" no permissions.deny do
+// <projeto>/.claude/settings.local.json, que é pessoal e fica fora do git (renomear mexeria no repositório de todos).
+// Toda gravação faz backup antes em ~/.claude/backups/<data>/ (apagar = mover para o backup).
+const PASTA_AGENTES_SUA = path.join(PASTA_CLAUDE, 'agents');
+const NOME_AGENTE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const ARQ_AGENTE = /^[a-z0-9][a-z0-9-]{0,63}\.md(\.desativado)?$/;
+const LIMITE_AGENTE = 200000;
+// Frontmatter em entradas { chave, linhas }: linha sem recuo com "chave:" abre uma entrada; o resto (recuo, linha
+// em branco) é continuação dela. Assim blocos com parágrafo e chaves desconhecidas são preservados como estão.
+function separaFrontmatter(texto) {
+    const m = String(texto).match(/^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+    if (!m) return { entradas: [], corpo: String(texto) };
+    const entradas = [];
+    for (const l of m[1].split(/\r?\n/)) {
+        if (/^[A-Za-z_][\w-]*:/.test(l)) entradas.push({ chave: l.split(':')[0], linhas: [l] });
+        else if (entradas.length) entradas[entradas.length - 1].linhas.push(l);
+        else entradas.push({ chave: '', linhas: [l] });
+    }
+    return { entradas, corpo: String(texto).slice(m[0].length) };
+}
+// Valor de uma entrada: escalar simples (com continuação recuada) ou bloco | / > (com +/-)
+function valorEntrada(e) {
+    const primeira = e.linhas[0], resto = e.linhas.slice(1);
+    let v = primeira.slice(primeira.indexOf(':') + 1).trim();
+    const bloco = v.match(/^([|>])([+-]?)$/);
+    if (!bloco) {
+        if (/^(["']).*\1$/.test(v)) v = v.slice(1, -1);
+        const extra = resto.map(l => l.trim()).filter(Boolean);
+        return extra.length ? [v, ...extra].join(' ') : v;
+    }
+    const naoVazias = resto.filter(l => l.trim());
+    const recuo = naoVazias.length ? naoVazias[0].match(/^\s*/)[0].length : 0;
+    const ls = resto.map(l => (l.trim() ? l.slice(Math.min(recuo, l.match(/^\s*/)[0].length)) : ''));
+    while (ls.length && !ls[ls.length - 1]) ls.pop();
+    if (bloco[1] === '|') return ls.join('\n');
+    // ">": linhas seguidas viram uma (com espaço); linha vazia vira quebra
+    let out = '';
+    for (const l of ls) { if (!l) { out += '\n'; continue; } out += (out && !out.endsWith('\n') ? ' ' : '') + l; }
+    return out;
+}
+// Descrição: linha simples só se for segura em YAML; senão bloco |- (as quebras ficam)
+function linhasDescricao(desc) {
+    const d = String(desc).replace(/\r\n/g, '\n').trim();
+    const segura = !d.includes('\n') && !/: | #/.test(d) && !/^[-?:,[\]{}#&*!|>'"%@`]/.test(d) && !/:$/.test(d);
+    return segura ? ['description: ' + d] : ['description: |-', ...d.split('\n').map(l => (l ? '  ' + l : ''))];
+}
+function leAgente(arquivo, escopo, pasta) {
+    const st = fs.statSync(arquivo);
+    const texto = fs.readFileSync(arquivo, 'utf8');
+    const { entradas, corpo } = separaFrontmatter(texto);
+    const val = (k) => { const e = entradas.find(x => x.chave === k); return e ? valorEntrada(e) : ''; };
+    const base = path.basename(arquivo), ferramentas = val('tools');
+    return {
+        arquivo, escopo, pasta, ativo: !base.endsWith('.desativado'), editavel: ARQ_AGENTE.test(base) && st.size <= LIMITE_AGENTE,
+        nome: val('name') || base.replace(/\.md(\.desativado)?$/, ''), descricao: val('description'), modelo: val('model') || 'inherit',
+        esforco: val('effort'), ferramentas: ferramentas ? ferramentas.split(/\s*,\s*/).filter(Boolean) : [],
+        corpo: st.size > LIMITE_AGENTE ? corpo.slice(0, LIMITE_AGENTE) : corpo, cortado: st.size > LIMITE_AGENTE,
+    };
+}
+// Pastas de agentes que o painel aceita: a sua e a de cada projeto conhecido (listaProjetos, sem "Sem projeto")
+function pastasDeAgentes() {
+    const lista = [{ dir: PASTA_AGENTES_SUA, escopo: 'seu', pasta: null, titulo: 'Seus (valem em todos os projetos)' }];
+    const vistos = new Set([PASTA_AGENTES_SUA.toLowerCase()]);
+    for (const p of listaProjetos()) {
+        if (p.semProjeto || !p.cwd) continue;
+        const dir = path.join(p.cwd, '.claude', 'agents');
+        if (vistos.has(dir.toLowerCase())) continue;
+        vistos.add(dir.toLowerCase());
+        lista.push({ dir, escopo: 'projeto', pasta: p.cwd, titulo: 'Projeto ' + (p.nome || path.basename(p.cwd)) });
+    }
+    return lista;
+}
+// Agentes bloqueados só para você neste projeto (permissions.deny do settings.local.json)
+function arquivoLocalProjeto(pastaProjeto) { return path.join(pastaProjeto, '.claude', 'settings.local.json'); }
+function bloqueadosNoProjeto(pastaProjeto) {
+    try {
+        const j = JSON.parse(fs.readFileSync(arquivoLocalProjeto(pastaProjeto), 'utf8'));
+        const deny = (j.permissions && Array.isArray(j.permissions.deny)) ? j.permissions.deny : [];
+        return new Set(deny.map(r => (String(r).match(/^(?:Agent|Task)\(([^()]+)\)$/) || [])[1]).filter(Boolean));
+    } catch (e) { return new Set(); }
+}
+function bloqueiaNoProjeto(pastaProjeto, nome, bloquear) {
+    const arq = arquivoLocalProjeto(pastaProjeto);
+    let j = {};
+    if (fs.existsSync(arq)) {
+        // JSON com erro: não sobrescreve (perderia o que você tem lá)
+        try { j = JSON.parse(fs.readFileSync(arq, 'utf8')); } catch (e) { throw erroAgente('O .claude/settings.local.json deste projeto está com erro de JSON; corrija antes.'); }
+        backupArquivoAgente(arq);
+    }
+    j.permissions = j.permissions || {};
+    const regra = 'Agent(' + nome + ')';
+    const deny = (Array.isArray(j.permissions.deny) ? j.permissions.deny : []).filter(r => r !== regra && r !== 'Task(' + nome + ')');
+    if (bloquear) deny.push(regra);
+    if (deny.length) j.permissions.deny = deny; else delete j.permissions.deny;
+    fs.mkdirSync(path.dirname(arq), { recursive: true });
+    fs.writeFileSync(arq, JSON.stringify(j, null, 2) + '\n');
+}
+function listaAgentes() {
+    const grupos = [];
+    for (const g of pastasDeAgentes()) {
+        let nomes;
+        try { nomes = fs.readdirSync(g.dir).filter(n => /\.md(\.desativado)?$/i.test(n)); } catch (e) { continue; }
+        const agentes = [];
+        for (const n of nomes.sort()) { try { agentes.push(leAgente(path.join(g.dir, n), g.escopo, g.pasta)); } catch (e) { /* ilegível */ } }
+        if (g.escopo === 'projeto') {
+            const bloqueados = bloqueadosNoProjeto(g.pasta);
+            agentes.forEach(a => { if (bloqueados.has(a.nome)) { a.ativo = false; a.soParaVoce = true; } });
+        }
+        if (agentes.length) grupos.push({ ...g, agentes });
+    }
+    // Agente ativo de projeto com o mesmo nome de um seu ativo: o do projeto vale (como no Claude Code)
+    const seus = new Set((grupos.find(g => g.escopo === 'seu') || { agentes: [] }).agentes.filter(a => a.ativo).map(a => a.nome));
+    grupos.forEach(g => g.agentes.forEach(a => { a.sobrepoe = g.escopo === 'projeto' && a.ativo && seus.has(a.nome); }));
+    return grupos;
+}
+function erroAgente(msg) { const e = new Error(msg); e.status = 400; return e; }
+function validaArquivoAgente(arq) {
+    const abs = path.resolve(String(arq || ''));
+    const dir = path.dirname(abs).toLowerCase();
+    if (!pastasDeAgentes().some(g => g.dir.toLowerCase() === dir)) throw erroAgente('Pasta de agentes desconhecida.');
+    if (!ARQ_AGENTE.test(path.basename(abs))) throw erroAgente('Nome de arquivo de agente inválido.');
+    return abs;
+}
+function pastaDoEscopo(escopo) {
+    if (escopo === 'seu') return PASTA_AGENTES_SUA;
+    const alvo = path.resolve(String(escopo || '')).toLowerCase();
+    const p = listaProjetos().find(x => !x.semProjeto && x.cwd && path.resolve(x.cwd).toLowerCase() === alvo);
+    if (!p) throw erroAgente('Projeto desconhecido.');
+    return path.join(p.cwd, '.claude', 'agents');
+}
+function validaCamposAgente(c) {
+    const nome = String(c.nome || '').trim();
+    if (!NOME_AGENTE.test(nome)) throw erroAgente('Nome: só letras minúsculas, números e hífen (até 64).');
+    const descricao = String(c.descricao || '').replace(/\r\n/g, '\n').trim();
+    if (!descricao) throw erroAgente('A descrição não pode ficar vazia: é ela que diz ao Claude quando chamar o agente.');
+    if (descricao.length > 4000) throw erroAgente('Descrição longa demais (até 4000 letras).');
+    const modelo = String(c.modelo || 'inherit').trim();
+    if (!/^[A-Za-z0-9._[\]-]+$/.test(modelo)) throw erroAgente('Modelo inválido.');
+    const esforco = String(c.esforco || '').trim();
+    if (esforco && !/^[A-Za-z0-9_-]+$/.test(esforco)) throw erroAgente('Esforço inválido.');
+    const ferramentas = String(c.ferramentas || '').split(',').map(s => s.trim()).filter(Boolean);
+    for (const f of ferramentas) if (!/^[A-Za-z0-9_.*/:-]+(\([^()\r\n,]*\))?$/.test(f)) throw erroAgente('Ferramenta inválida: ' + f);
+    const corpo = String(c.corpo == null ? '' : c.corpo).replace(/\r\n/g, '\n');
+    if (corpo.length > 100000) throw erroAgente('Instruções longas demais (até 100 mil letras).');
+    return { nome, descricao, modelo, esforco, ferramentas, corpo };
+}
+function montaAgente(original, c) {
+    const { entradas } = original ? separaFrontmatter(original) : { entradas: [] };
+    const tem = (k) => entradas.some(e => e.chave === k);
+    const linhas = ['---', 'name: ' + c.nome, ...linhasDescricao(c.descricao)];
+    // Sem linha "model" no original e continua "igual à conversa": não cria a linha (não gera diff à toa)
+    if (!(c.modelo === 'inherit' && !tem('model'))) linhas.push('model: ' + c.modelo);
+    if (c.esforco) linhas.push('effort: ' + c.esforco);
+    if (c.ferramentas.length) linhas.push('tools: ' + c.ferramentas.join(', '));
+    for (const e of entradas) if (!['name', 'description', 'model', 'effort', 'tools'].includes(e.chave)) linhas.push(...e.linhas);
+    linhas.push('---');
+    const texto = linhas.join('\n') + '\n' + c.corpo;
+    return original && original.includes('\r\n') ? texto.replace(/\n/g, '\r\n') : texto;
+}
+function backupArquivoAgente(abs) {
+    const d = new Date(), z = (n) => String(n).padStart(2, '0');
+    const pastaBk = path.join(PASTA_CLAUDE, 'backups', `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}-${z(d.getSeconds())}`);
+    const claude = path.join(PASTA_CLAUDE);
+    const rel = abs.toLowerCase().startsWith(claude.toLowerCase() + path.sep) ? path.relative(claude, abs) : path.join('projetos', abs.replace(/^([A-Za-z]):[\\/]/, '$1' + path.sep));
+    const destino = path.join(pastaBk, rel);
+    fs.mkdirSync(path.dirname(destino), { recursive: true });
+    fs.copyFileSync(abs, destino);
+    return destino;
+}
+function acaoAgente(corpo) {
+    const acao = corpo.acao;
+    if (acao === 'criar') {
+        const dir = pastaDoEscopo(corpo.escopo);
+        const c = validaCamposAgente(corpo);
+        const abs = path.join(dir, c.nome + '.md');
+        if (fs.existsSync(abs) || fs.existsSync(abs + '.desativado')) throw erroAgente('Já existe um agente com esse nome nesta pasta.');
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(abs, montaAgente('', c));
+        return;
+    }
+    const abs = validaArquivoAgente(corpo.arquivo);
+    if (!fs.existsSync(abs)) throw erroAgente('Arquivo do agente não encontrado.');
+    const grupo = pastasDeAgentes().find(g => g.dir.toLowerCase() === path.dirname(abs).toLowerCase());
+    if ((acao === 'ativar' || acao === 'desativar') && grupo && grupo.escopo === 'projeto') {
+        const nome = leAgente(abs, grupo.escopo, grupo.pasta).nome;
+        if (!NOME_AGENTE.test(nome)) throw erroAgente('Nome de agente inválido.');
+        bloqueiaNoProjeto(grupo.pasta, nome, acao === 'desativar');
+        // Desativado do jeito antigo (renomeado): volta o arquivo, para o repositório ficar como estava
+        if (acao === 'ativar' && abs.endsWith('.desativado') && !fs.existsSync(abs.replace(/\.desativado$/, ''))) {
+            backupArquivoAgente(abs);
+            fs.renameSync(abs, abs.replace(/\.desativado$/, ''));
+        }
+        return;
+    }
+    if (acao === 'ativar' || acao === 'desativar') {
+        const destino = acao === 'ativar' ? abs.replace(/\.desativado$/, '') : (abs.endsWith('.desativado') ? abs : abs + '.desativado');
+        if (destino === abs) return;
+        if (fs.existsSync(destino)) throw erroAgente('Já existe outro arquivo com esse nome.');
+        backupArquivoAgente(abs);
+        fs.renameSync(abs, destino);
+        return;
+    }
+    if (acao === 'apagar') { backupArquivoAgente(abs); fs.unlinkSync(abs); return; }
+    if (acao === 'salvar') {
+        if (fs.statSync(abs).size > LIMITE_AGENTE) throw erroAgente('Arquivo grande demais para editar aqui: use o VS Code.');
+        const original = fs.readFileSync(abs, 'utf8');
+        const c = validaCamposAgente(corpo);
+        const sufixo = abs.endsWith('.desativado') ? '.md.desativado' : '.md';
+        const novo = path.join(path.dirname(abs), c.nome + sufixo);
+        const trocouNome = novo.toLowerCase() !== abs.toLowerCase();
+        if (trocouNome) {
+            const b = path.join(path.dirname(abs), c.nome);
+            if (fs.existsSync(b + '.md') || fs.existsSync(b + '.md.desativado')) throw erroAgente('Já existe um agente com esse nome nesta pasta.');
+        }
+        backupArquivoAgente(abs);
+        fs.writeFileSync(novo, montaAgente(original, c));
+        if (trocouNome) fs.unlinkSync(abs);
+        return;
+    }
+    throw erroAgente('Ação inválida.');
+}
+// Regras e agentes (Configurações): como o Claude trabalha ao rodar as coisas.
+function regrasEAgentes(cwd) {
+    // Instruções que entram nas conversas: a sua (global) e as do projeto
+    const instrucoes = [];
+    const lerInstrucao = (titulo, arquivo, origem) => {
+        try {
+            const st = fs.statSync(arquivo);
+            if (!st.isFile()) return;
+            instrucoes.push({ titulo, arquivo, origem, texto: fs.readFileSync(arquivo, 'utf8').slice(0, 80000), cortado: st.size > 80000 });
+        } catch (e) { /* não existe */ }
+    };
+    lerInstrucao('Suas instruções (todas as conversas)', path.join(PASTA_CLAUDE, 'CLAUDE.md'), 'seu');
+    if (cwd) {
+        lerInstrucao('Instruções do projeto', path.join(cwd, 'CLAUDE.md'), 'projeto');
+        lerInstrucao('Instruções do projeto (.claude)', path.join(cwd, '.claude', 'CLAUDE.md'), 'projeto');
+        lerInstrucao('Instruções locais do projeto', path.join(cwd, 'CLAUDE.local.md'), 'projeto');
+        const pastaRegras = path.join(cwd, '.claude', 'rules');
+        try { for (const f of fs.readdirSync(pastaRegras).filter(f => f.endsWith('.md')).sort()) lerInstrucao('Regra: ' + f.replace(/\.md$/, ''), path.join(pastaRegras, f), 'projeto'); } catch (e) { /* sem regras */ }
+    }
+    return { grupos: listaAgentes(), instrucoes };
 }
 
 // Comandos e skills para o menu "/" da caixa de mensagem (do usuário e do projeto)
@@ -824,7 +1559,7 @@ function listaComandos(cwd) {
             return corta(String(desc || '').replace(/["']$/, ''), 140);
         } catch (e) { return ''; }
     };
-    const raizes = [[path.join(os.homedir(), '.claude'), 'seu'], cwd ? [path.join(cwd, '.claude'), 'projeto'] : null].filter(Boolean);
+    const raizes = [[path.join(PASTA_CLAUDE), 'seu'], cwd ? [path.join(cwd, '.claude'), 'projeto'] : null].filter(Boolean);
     for (const [raiz, origem] of raizes) {
         const pastaCmd = path.join(raiz, 'commands');
         if (fs.existsSync(pastaCmd)) for (const f of fs.readdirSync(pastaCmd)) if (f.endsWith('.md')) lista.push({ nome: f.replace(/\.md$/, ''), descricao: descricaoDe(path.join(pastaCmd, f)), origem: `comando ${origem}` });
@@ -897,6 +1632,12 @@ function listaProjetos() {
             if (!vistos.has(cwd.toLowerCase())) lista.push({ cwd, nome: d.name, grupo: 'Em ' + raizProjetos });
         }
     } catch (e) { /* raiz não existe */ }
+    // Pastas extras (Configurações › Claude Code): entram na lista, sem liberar editor/git (pastaConhecida não muda)
+    for (const p of leDados().pastasExtras || []) {
+        const k = String(p).toLowerCase();
+        if (vistos.has(k) || lista.some(x => x.cwd.toLowerCase() === k) || chat.ehChat(p) || !fs.existsSync(p)) continue;
+        lista.push({ cwd: p, nome: path.basename(p) || p, grupo: 'Suas pastas' });
+    }
     // Sem projeto: a pasta do usuário, sem as regras (CLAUDE.md) de nenhum projeto
     const casa = os.homedir();
     // Sempre oferecida, mesmo que a pasta do usuário já tenha conversas (aí ela sai de "Com conversas")
@@ -908,6 +1649,8 @@ function listaProjetos() {
 // Código do servidor mudou depois que ele subiu? (a página avisa e oferece o reinício seguro)
 const INICIO_SERVIDOR = Date.now();
 let reinicioAgendado = null;
+// Troca de perfil pendente: gravada no perfis.json só logo antes de sair (queda no meio = sobe com o perfil antigo)
+let perfilPendente = null, agendouPorPerfil = false, timerReinicio = null;
 // encerrar = true: sai com código 0 (o lançador não sobe de novo; o app desktop assume a porta)
 let encerrarEmVezDeReiniciar = false;
 function agendaReinicio(encerrar = false) {
@@ -915,18 +1658,28 @@ function agendaReinicio(encerrar = false) {
     if (reinicioAgendado) return;
     reinicioAgendado = new Date().toISOString();
     const tenta = () => {
+        if (!reinicioAgendado) return;
         chat.fechaOciosas(0);
         const vivas = chat.estado().filter(c => c.vivo || c.status === 'rodando' || c.status === 'parando');
-        if (vivas.length || terminal.quantos()) return setTimeout(tenta, 5000);
-        console.log('Reiniciando para carregar o código novo');
+        if (vivas.length || terminal.quantos()) { timerReinicio = setTimeout(tenta, 5000); return; }
+        if (perfilPendente) {
+            console.log('Trocando para o perfil ' + perfilPendente);
+            if (!perfis.gravaAtivo(perfilPendente)) console.log('Perfil pendente sumiu; continua o atual');
+        } else console.log('Reiniciando para carregar o código novo');
         servidor.close();
         setTimeout(() => process.exit(encerrarEmVezDeReiniciar ? 0 : 75), 300);
     };
-    setTimeout(tenta, 1000);
+    timerReinicio = setTimeout(tenta, 1000);
+}
+// Cancela a troca de perfil; o reinício só é cancelado se foi a troca que o pediu (reinício de código continua)
+function cancelaTrocaPerfil() {
+    perfilPendente = null;
+    if (agendouPorPerfil && !encerrarEmVezDeReiniciar) { reinicioAgendado = null; clearTimeout(timerReinicio); }
+    agendouPorPerfil = false;
 }
 function versaoServidor() {
     const alterado = Math.max(...['server.js', 'chat.js'].map(a => { try { return fs.statSync(path.join(__dirname, a)).mtimeMs; } catch (e) { return 0; } }));
-    return { encerrar: encerrarEmVezDeReiniciar, terminais: terminal.quantos(), comLancador: !!process.env.PAINEL_LANCADOR, desatualizado: alterado > INICIO_SERVIDOR, iniciado: new Date(INICIO_SERVIDOR).toISOString(), alterado: new Date(alterado).toISOString(), reinicioAgendado };
+    return { vigiados: [...vigias.keys()], perfil: perfis.perfilInfo(), perfilPendente: perfilPendente ? perfis.perfilInfo(perfilPendente) : null, encerrar: encerrarEmVezDeReiniciar, terminais: terminal.quantos(), comLancador: !!process.env.PAINEL_LANCADOR, pastaDados: PASTA_DADOS, desatualizado: alterado > INICIO_SERVIDOR, iniciado: new Date(INICIO_SERVIDOR).toISOString(), alterado: new Date(alterado).toISOString(), reinicioAgendado };
 }
 
 // Mesma trava do enviar: não mexe numa conversa trabalhando em outro lugar
@@ -945,7 +1698,8 @@ function sessaoDoCorpo(corpo) {
 
 // Edições de um arquivo feitas na conversa (Edit, MultiEdit, Write), lidas do transcript
 function diffsDoArquivo(projeto, id, arquivoAlvo) {
-    const arquivo = path.join(RAIZ_PROJETOS, projeto, id + '.jsonl');
+    const achado = arquivoDaSessao(projeto, id);
+    const arquivo = achado ? achado.arquivo : path.join(RAIZ_PROJETOS, projeto, id + '.jsonl');
     const alvo = path.resolve(arquivoAlvo).toLowerCase();
     const lista = [];
     let total = 0;
@@ -983,7 +1737,7 @@ function gitDiff(cwd, arquivo) {
 }
 
 // Plugins ligados/desligados no ~/.claude/settings.json (com backup antes de gravar)
-const ARQ_SETTINGS = path.join(os.homedir(), '.claude', 'settings.json');
+const ARQ_SETTINGS = path.join(PASTA_CLAUDE, 'settings.json');
 function lePlugins() {
     const json = JSON.parse(fs.readFileSync(ARQ_SETTINGS, 'utf8'));
     return Object.entries(json.enabledPlugins || {}).map(([nome, ligado]) => ({ nome, ligado: !!ligado }));
@@ -993,7 +1747,7 @@ function gravaPlugin(nome, ligado) {
     const json = JSON.parse(bruto);
     if (!json.enabledPlugins || !(nome in json.enabledPlugins)) throw new Error('Plugin não encontrado nas configurações.');
     const d = new Date(), z = (n) => String(n).padStart(2, '0');
-    const pasta = path.join(os.homedir(), '.claude', 'backups', `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}-${z(d.getSeconds())}`);
+    const pasta = path.join(PASTA_CLAUDE, 'backups', `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}-${z(d.getSeconds())}`);
     fs.mkdirSync(pasta, { recursive: true });
     fs.writeFileSync(path.join(pasta, 'settings.json'), bruto);
     json.enabledPlugins[nome] = !!ligado;
@@ -1010,10 +1764,18 @@ async function rotaChat(req, res, url) {
     if (url.pathname === '/api/versao' && req.method === 'GET') return responde(res, 200, versaoServidor());
     if (url.pathname === '/api/chat/estado' && req.method === 'GET') return responde(res, 200, chat.estado());
     if (url.pathname === '/api/projetos' && req.method === 'GET') return responde(res, 200, listaProjetos());
-    if (url.pathname === '/api/dados' && req.method === 'GET') return responde(res, 200, { ...leDados(), chatProjeto: chat.pastaDoProjeto(chat.CHAT_DIR) });
+    if (url.pathname === '/api/dados' && req.method === 'GET') return responde(res, 200, { ...leDados(), chatProjeto: chat.pastaDoProjeto(chat.CHAT_DIR), usuario: nomeUsuario() });
     if (url.pathname.startsWith('/api/git/')) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
         const cwd = req.method === 'GET' ? url.searchParams.get('cwd') : null;
+        const sessGit = String(url.searchParams.get('sessao') || '');
+        let ctxGit = null;
+        if (/^[^\\/]+\/[0-9a-f-]{36}$/i.test(sessGit)) {
+            const [pj, ss] = sessGit.split('/');
+            const ent = entradaDaConversa(pj, ss);
+            if (ent) { try { ctxGit = { env: perfis.envDaConversa(ent), idIdentidade: ent.git || null }; } catch (e) { return responde(res, 409, { erro: e.message }); } }
+        }
+        return gitScm.contextoGit.run(ctxGit, async () => {
         try {
             if (req.method === 'GET') {
                 if (!pastaConhecida(cwd)) return responde(res, 403, { erro: 'Pasta de projeto desconhecida.' });
@@ -1025,6 +1787,7 @@ async function rotaChat(req, res, url) {
                 if (url.pathname === '/api/git/branches') return responde(res, 200, await gitScm.branches(cwd));
                 if (url.pathname === '/api/git/a-subir') return responde(res, 200, { commits: await gitScm.aSubir(cwd), hooks: await gitScm.hooksComEfeito(cwd) });
                 if (url.pathname === '/api/git/hooks') return responde(res, 200, { hooks: await gitScm.hooksComEfeito(cwd) });
+                if (url.pathname === '/api/git/avatar') return responde(res, 200, { dataUrl: await gitScm.avatar(cwd, q('email'), q('hash')) });
                 return responde(res, 404, { erro: 'não encontrado' });
             }
             if (req.method !== 'POST' || url.pathname !== '/api/git/acao') return responde(res, 405, { erro: 'use POST' });
@@ -1032,12 +1795,14 @@ async function rotaChat(req, res, url) {
             if (!pastaConhecida(corpo.cwd)) return responde(res, 403, { erro: 'Pasta de projeto desconhecida.' });
             return responde(res, 200, await gitScm.acao(corpo.cwd, corpo));
         } catch (e) { return responde(res, e.status || 500, { erro: e.message }); }
+        });
     }
     if (req.method === 'GET' && url.pathname === '/api/automacao') {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
         const dados = leDados();
         const desde = Number(url.searchParams.get('desde')) || 0;
-        return responde(res, 200, { agendamentos: dados.agendamentos || [], fila: dados.fila || [], filaPausada: !!dados.filaPausada, eventos: eventosAutomacao.filter(e => e.em > desde), agora: Date.now() });
+        const ag = dados.agendamentos || [], fi = dados.fila || [];
+        return responde(res, 200, { agendamentos: ag.filter(automacao.doPerfil), fila: fi.filter(automacao.doPerfil), outrosPerfis: ag.filter(a => !automacao.doPerfil(a)).length + fi.filter(i => !automacao.doPerfil(i)).length, filaPausada: !!dados.filaPausada, eventos: eventosAutomacao.filter(e => e.em > desde), agora: Date.now() });
     }
     if (req.method === 'GET' && (url.pathname === '/api/github' || url.pathname === '/api/hooks')) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
@@ -1052,7 +1817,7 @@ async function rotaChat(req, res, url) {
     if (req.method === 'GET' && ['/api/busca', '/api/resumo-dia', '/api/modelos-pedido'].includes(url.pathname)) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
         try {
-            if (url.pathname === '/api/busca') return responde(res, 200, await alem.busca(listaSessoes(), RAIZ_PROJETOS, url.searchParams.get('q'), url.searchParams.get('tipo') === 'arquivo' ? 'arquivo' : 'texto'));
+            if (url.pathname === '/api/busca') return responde(res, 200, await alem.busca(listaSessoes(), (s) => (arquivoDaSessao(s.projeto, s.id) || {}).arquivo, url.searchParams.get('q'), url.searchParams.get('tipo') === 'arquivo' ? 'arquivo' : 'texto'));
             if (url.pathname === '/api/resumo-dia') return responde(res, 200, alem.resumoDia(listaSessoes(), detalheSessao));
             return responde(res, 200, alem.modelos(leDados()));
         } catch (e) { return responde(res, 400, { erro: e.message }); }
@@ -1067,13 +1832,43 @@ async function rotaChat(req, res, url) {
             return responde(res, 200, await worktrees.listar(cwd));
         } catch (e) { return responde(res, 500, { erro: e.message }); }
     }
+    if (req.method === 'GET' && url.pathname === '/api/por-comando/vivo') {
+        if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+        const projeto = String(url.searchParams.get('projeto') || ''), sessao = String(url.searchParams.get('sessao') || '');
+        if (!projeto || !sessao || /[\\/]|\.\./.test(projeto + sessao)) return responde(res, 400, { erro: 'sessão inválida' });
+        let visto = {};
+        try { visto = JSON.parse(url.searchParams.get('visto') || '{}') || {}; } catch (e) { visto = {}; }
+        try {
+            const r = await alteracoesAoVivo(projeto, sessao, String(url.searchParams.get('id') || ''), visto);
+            return r === null ? responde(res, 404, { erro: 'Sessão não encontrada.' }) : responde(res, 200, r);
+        } catch (e) { return responde(res, 500, { erro: e.message }); }
+    }
+    if (req.method === 'GET' && url.pathname === '/api/por-comando') {
+        if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+        const projeto = String(url.searchParams.get('projeto') || ''), sessao = String(url.searchParams.get('sessao') || '');
+        if (!projeto || !sessao || /[\\/]|\.\./.test(projeto + sessao)) return responde(res, 400, { erro: 'sessão inválida' });
+        try {
+            const lista = await alteracoesDoComando(projeto, sessao, String(url.searchParams.get('id') || ''));
+            return lista === null ? responde(res, 404, { erro: 'Sessão não encontrada.' }) : responde(res, 200, lista);
+        } catch (e) { return responde(res, 500, { erro: 'Não deu para ler as alterações do comando.' }); }
+    }
     if (req.method === 'GET' && url.pathname.startsWith('/api/editor/')) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
         const cwd = url.searchParams.get('cwd');
         if (!pastaConhecida(cwd)) return responde(res, 403, { erro: 'Pasta de projeto desconhecida.' });
         try {
             if (url.pathname === '/api/editor/arvore') return responde(res, 200, editorArquivos.arvore(cwd, url.searchParams.get('dir') || '.'));
-            if (url.pathname === '/api/editor/arquivo') return responde(res, 200, editorArquivos.ler(cwd, url.searchParams.get('caminho')));
+            if (url.pathname === '/api/editor/arquivo') {
+                const caminho = url.searchParams.get('caminho') || '';
+                const abs = path.resolve(cwd, caminho);
+                const dentro = abs.toLowerCase().startsWith(path.resolve(cwd).toLowerCase() + path.sep);
+                // Fora da pasta da conversa: só abre se a própria conversa editou esse arquivo
+                const lido = !dentro && editadoNaSessao(url.searchParams.get('projeto'), url.searchParams.get('sessao'), abs)
+                    ? editorArquivos.ler(path.dirname(abs), path.basename(abs)) : editorArquivos.ler(cwd, caminho);
+                // Retrato: base para descobrir o que um comando mudar depois neste arquivo
+                guardaRetrato(lido.caminho, lido.conteudo);
+                return responde(res, 200, lido);
+            }
             if (url.pathname === '/api/editor/diagnosticos') return responde(res, 200, await editorArquivos.diagnosticos(cwd, url.searchParams.get('caminho')));
         } catch (e) { return responde(res, e.status || 500, { erro: e.message }); }
         return responde(res, 404, { erro: 'não encontrado' });
@@ -1092,7 +1887,13 @@ async function rotaChat(req, res, url) {
             dados.git = await gitDiff(detalhe.cwd, path.resolve(detalhe.cwd, arquivo));
             return responde(res, 200, dados);
         }
-        try { return responde(res, 200, await chat.statusMcp(url.searchParams.get('sessao'), detalhe.cwd)); } catch (e) { return responde(res, 500, { erro: e.message }); }
+        try { const entM = entradaDaConversa(url.searchParams.get('projeto'), url.searchParams.get('sessao')); return responde(res, 200, await chat.statusMcp(url.searchParams.get('sessao'), detalhe.cwd, entM ? perfis.envDaConversa(entM) : undefined)); } catch (e) { return responde(res, 500, { erro: e.message }); }
+    }
+    if (url.pathname === '/api/perfis' && req.method === 'GET') {
+        if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+        const vivas = chat.estado().filter(c => c.vivo || c.status === 'rodando' || c.status === 'parando');
+        const r = await perfis.lista();
+        return responde(res, 200, { ...r, home: os.homedir(), env: Object.fromEntries(r.perfis.map(p => [p.id, perfis.envVisivel(p.id)])), pendente: perfilPendente, segurando: { conversas: vivas.length, terminais: terminal.quantos() }, comLancador: !!process.env.PAINEL_LANCADOR });
     }
     if (req.method !== 'POST') return responde(res, 405, { erro: 'use POST' });
     if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
@@ -1101,9 +1902,11 @@ async function rotaChat(req, res, url) {
     if (url.pathname === '/api/agendamentos') {
         try {
             const dados = leDados();
-            dados.agendamentos = automacao.validaAgendamentos(corpo.lista, pastaConhecida, dados.agendamentos || []);
+            const outros = (dados.agendamentos || []).filter(a => !automacao.doPerfil(a));
+            const meus = automacao.validaAgendamentos(corpo.lista, pastaConhecida, (dados.agendamentos || []).filter(automacao.doPerfil));
+            dados.agendamentos = [...outros, ...meus];
             gravaDados(dados);
-            return responde(res, 200, dados.agendamentos);
+            return responde(res, 200, meus);
         } catch (e) { return responde(res, 400, { erro: e.message }); }
     }
     if (url.pathname === '/api/agendamentos/rodar') {
@@ -1116,17 +1919,17 @@ async function rotaChat(req, res, url) {
             if (corpo.acao === 'adicionar') {
                 if (dados.fila.filter(i => i.status === 'esperando').length >= 50) throw new Error('A fila já tem 50 pedidos esperando.');
                 const p = automacao.validaPedido(corpo.pedido || {}, pastaConhecida);
-                dados.fila.push({ id: crypto.randomBytes(6).toString('hex'), ...p, status: 'esperando', criado: new Date().toISOString() });
+                dados.fila.push({ id: crypto.randomBytes(6).toString('hex'), ...p, status: 'esperando', criado: new Date().toISOString(), perfil: perfis.perfilEmUso() });
             } else if (corpo.acao === 'remover') {
-                dados.fila = dados.fila.filter(i => !(i.id === corpo.id && i.status !== 'rodando'));
+                dados.fila = dados.fila.filter(i => !(i.id === corpo.id && i.status !== 'rodando' && automacao.doPerfil(i)));
             } else if (corpo.acao === 'limpar') {
-                dados.fila = dados.fila.filter(i => i.status === 'esperando' || i.status === 'rodando');
+                dados.fila = dados.fila.filter(i => i.status === 'esperando' || i.status === 'rodando' || !automacao.doPerfil(i));
             } else if (corpo.acao === 'pausar') {
                 dados.filaPausada = !!corpo.pausada;
             } else throw new Error('ação inválida');
             gravaDados(dados);
             setTimeout(() => automatico.ciclo().catch(() => {}), 500);
-            return responde(res, 200, { fila: dados.fila, filaPausada: !!dados.filaPausada });
+            return responde(res, 200, { fila: dados.fila.filter(automacao.doPerfil), filaPausada: !!dados.filaPausada });
         } catch (e) { return responde(res, 400, { erro: e.message }); }
     }
     if (url.pathname === '/api/trello') {
@@ -1188,20 +1991,57 @@ async function rotaChat(req, res, url) {
         if (!detalhe) return responde(res, 404, { erro: 'Sessão não encontrada.' });
         if (!/^[0-9a-f-]{36}$/i.test(String(corpo.uuid))) return responde(res, 400, { erro: 'mensagem inválida' });
         if (url.pathname === '/api/chat/ramificar') {
+            const ent = entradaDaConversa(corpo.projeto, corpo.sessao);
+            const achadoR = arquivoDaSessao(String(corpo.projeto), String(corpo.sessao));
+            if (achadoR && resolveMin(achadoR.raiz) !== resolveMin(RAIZ_PROJETOS)) return responde(res, 409, { erro: 'Ramificar só funciona em conversas da conta do Claude do perfil atual.' });
             try {
                 const r = await chat.ramificar(String(corpo.sessao), detalhe.cwd, corpo.uuid);
                 const dados = leDados();
                 dados.vinculos[`${corpo.projeto}/${r.sessionId}`] = `${corpo.projeto}/${corpo.sessao}`;
+                if (ent) { dados.porConversa = dados.porConversa || {}; dados.porConversa[chaveConversa(corpo.projeto, r.sessionId)] = { ...ent, projeto: corpo.projeto, sessao: r.sessionId }; }
                 gravaDados(dados);
                 return responde(res, 200, { ok: true, chave: `${corpo.projeto}/${r.sessionId}` });
             } catch (e) { return responde(res, 500, { erro: e.message }); }
         }
         const trava = travaDaSessao(detalhe, String(corpo.sessao));
         if (trava && !corpo.simular) return responde(res, 409, { erro: trava });
-        try { return responde(res, 200, await chat.voltarArquivos(String(corpo.sessao), detalhe.cwd, corpo.uuid, !!corpo.simular)); }
+        let envV = null;
+        try { envV = entradaDaConversa(corpo.projeto, corpo.sessao) ? envDeConversa(corpo.projeto, corpo.sessao) : null; } catch (e) { return responde(res, 409, { erro: e.message }); }
+        try { return responde(res, 200, await chat.voltarArquivos(String(corpo.sessao), detalhe.cwd, corpo.uuid, !!corpo.simular, envV || undefined)); }
         catch (e) { return responde(res, 500, { erro: e.message }); }
     }
 
+    if (url.pathname === '/api/agentes') {
+        try { acaoAgente(corpo); }
+        catch (e) { return responde(res, e.status || 500, { erro: e.status ? e.message : 'Não deu para mudar o agente: ' + e.message }); }
+        return responde(res, 200, regrasEAgentes(corpo.cwd && pastaConhecida(corpo.cwd) ? corpo.cwd : null));
+    }
+    if (url.pathname === '/api/pastas') {
+        const dados = leDados();
+        const lista = Array.isArray(dados.pastasExtras) ? dados.pastasExtras : [];
+        const pasta = path.resolve(String(corpo.pasta || '').trim().replace(/^"|"$/g, '') || '.');
+        if (corpo.acao === 'remover') {
+            dados.pastasExtras = lista.filter(p => p.toLowerCase() !== pasta.toLowerCase());
+            gravaDados(dados);
+            return responde(res, 200, { ok: true, pastasExtras: dados.pastasExtras });
+        }
+        if (corpo.acao !== 'adicionar' || !String(corpo.pasta || '').trim()) return responde(res, 400, { erro: 'Pedido inválido.' });
+        let st;
+        try { st = fs.statSync(pasta); } catch (e) { return responde(res, 400, { erro: 'Pasta não encontrada.' }); }
+        if (!st.isDirectory()) return responde(res, 400, { erro: 'Isso não é uma pasta.' });
+        if (chat.ehChat(pasta)) return responde(res, 400, { erro: 'A pasta das conversas de Chat não entra na lista.' });
+        if (!lista.some(p => p.toLowerCase() === pasta.toLowerCase())) lista.push(pasta);
+        dados.pastasExtras = lista;
+        gravaDados(dados);
+        return responde(res, 200, { ok: true, pastasExtras: lista });
+    }
+    if (url.pathname === '/api/navegador') {
+        if (!['padrao', 'edge', 'chrome', 'firefox'].includes(corpo.navegador)) return responde(res, 400, { erro: 'Navegador inválido.' });
+        const dados = leDados();
+        dados.navegador = corpo.navegador;
+        gravaDados(dados);
+        return responde(res, 200, { ok: true });
+    }
     if (url.pathname === '/api/chat/modo') {
         if (!chat.MODOS.includes(corpo.modo)) return responde(res, 400, { erro: 'modo inválido' });
         try {
@@ -1239,9 +2079,24 @@ async function rotaChat(req, res, url) {
         if (!cwd || !fs.existsSync(cwd)) return responde(res, 400, { erro: 'Pasta do projeto não encontrada.' });
         // Conversa nova que continua outra: grava o vínculo assim que a sessão nascer
         const origem = !corpo.sessao && chaveValida(corpo.origem) ? corpo.origem : null;
-        const aoCriarSessao = origem ? (projeto, sessionId) => {
+        // Conta/identidade: conversa existente usa a escolha dela; nova usa o que veio da tela (ids conferidos)
+        let entrada = null;
+        if (corpo.sessao) entrada = entradaDaConversa(corpo.projeto, corpo.sessao);
+        else if (corpo.claude || corpo.git) {
+            const dadosPerfis = perfis.le();
+            const perfilUso = [{ id: 'padrao', claude: dadosPerfis.padraoClaude, git: dadosPerfis.padraoGit }, ...(dadosPerfis.perfis || [])].find(p => p.id === perfis.perfilEmUso()) || {};
+            const claudeNova = String(corpo.claude || perfilUso.claude || 'padrao'), gitNova = String(corpo.git || perfilUso.git || 'padrao');
+            if (!perfis.ID.test(claudeNova) || !perfis.existeConta(claudeNova)) return responde(res, 400, { erro: 'Conta do Claude inválida.' });
+            if (!perfis.ID.test(gitNova) || !perfis.existeIdentidade(gitNova)) return responde(res, 400, { erro: 'Identidade do Git inválida.' });
+            entrada = { claude: claudeNova, git: gitNova };
+        }
+        let envConversa = null;
+        try { envConversa = entrada ? perfis.envDaConversa(entrada) : null; } catch (e) { return responde(res, 409, { erro: e.message }); }
+        // Sempre existe: grava o vínculo (continuação) e a conta/identidade escolhidas, quando a sessão nasce
+        const aoCriarSessao = (origem || (entrada && !corpo.sessao)) ? (projeto, sessionId) => {
             const dados = leDados();
-            dados.vinculos[`${projeto}/${sessionId}`] = origem;
+            if (origem) dados.vinculos[`${projeto}/${sessionId}`] = origem;
+            if (entrada && !corpo.sessao) { dados.porConversa = dados.porConversa || {}; dados.porConversa[chaveConversa(projeto, sessionId)] = { ...entrada, projeto, sessao: sessionId }; }
             gravaDados(dados);
         } : null;
         // Chat não tem como ler arquivos: só imagens
@@ -1251,15 +2106,71 @@ async function rotaChat(req, res, url) {
         const { imagens: imagensAnexas, textoExtra } = preparaAnexos(corpo.anexos);
         const conversa = await chat.enviar({
             cwd, sessao: corpo.sessao, texto: texto + textoExtra, modelo: corpo.modelo, esforco: corpo.esforco,
-            modo: corpo.modo, imagens: imagensAnexas, aoCriarSessao,
+            modo: corpo.modo, imagens: imagensAnexas, aoCriarSessao, env: envConversa, assinatura: assinaturaDe(entrada),
         });
         return responde(res, 200, { chave: conversa.chave, projeto: conversa.projeto });
+    }
+    if (url.pathname === '/api/conversa/conta') {
+        if (!corpo.projeto || !corpo.sessao || /[\\/]|\.\./.test(String(corpo.projeto) + String(corpo.sessao))) return responde(res, 400, { erro: 'sessão inválida' });
+        const achadoC = arquivoDaSessao(String(corpo.projeto), String(corpo.sessao));
+        if (!achadoC) return responde(res, 404, { erro: 'Conversa não encontrada.' });
+        const git = String(corpo.git || '');
+        if (!perfis.ID.test(git) || !perfis.existeIdentidade(git)) return responde(res, 400, { erro: 'Identidade do Git inválida.' });
+        const dados = leDados();
+        dados.porConversa = dados.porConversa || {};
+        const k = chaveConversa(corpo.projeto, corpo.sessao);
+        // A conta do Claude fica a de onde o transcript está (fixa); grava as duas em valor absoluto
+        const atual = dados.porConversa[k] || {};
+        // Conta = a pasta onde o transcript está (procura a conta cuja projects/ é essa raiz)
+        const contaAtual = atual.claude || ['padrao', ...perfis.le().contasClaude.map(c => c.id)].find(id => resolveMin(perfis.raizDaConta(id)) === resolveMin(achadoC.raiz)) || 'padrao';
+        dados.porConversa[k] = { claude: contaAtual, git, projeto: String(corpo.projeto), sessao: String(corpo.sessao) };
+        gravaDados(dados);
+        const viva = chat.vivaNaSessao(String(corpo.sessao));
+        return responde(res, 200, { ok: true, aplicaDepois: !!(viva && (viva.status === 'rodando' || viva.status === 'parando' || (viva.tarefasBg || []).length)) });
+    }
+    if (url.pathname === '/api/perfis') {
+        try {
+            if (corpo.acao === 'ativar') {
+                if (!process.env.PAINEL_LANCADOR) return responde(res, 409, { erro: 'Trocar de perfil precisa do Red Code aberto pelo app (ou pelo lançador).' });
+                const id = String(corpo.id || '');
+                if (!perfis.ID.test(id)) throw Object.assign(new Error('Perfil inválido.'), { status: 400 });
+                if (!perfis.existePerfil(id)) throw Object.assign(new Error('Perfil não encontrado.'), { status: 400 });
+                if (id === perfis.perfilEmUso()) { cancelaTrocaPerfil(); return responde(res, 200, { ok: true, pendente: null }); }
+                perfilPendente = id;
+                if (!reinicioAgendado) { agendouPorPerfil = true; agendaReinicio(); }
+                return responde(res, 200, { ok: true, pendente: perfilPendente });
+            }
+            if (corpo.acao === 'cancelar') { cancelaTrocaPerfil(); return responde(res, 200, { ok: true }); }
+            if (corpo.acao === 'apagar-conta' || corpo.acao === 'apagar-identidade') {
+                const parte = corpo.acao === 'apagar-conta' ? 'claude' : 'git';
+                const dados = leDados();
+                const pc = dados.porConversa || {};
+                let mudou = false;
+                const usando = [];
+                for (const [k, e] of Object.entries(pc)) {
+                    if (!e || e[parte] !== corpo.id) continue;
+                    // Entrada órfã (conversa apagada): limpa
+                    if (!arquivoDaSessao(e.projeto, e.sessao)) { delete pc[k]; mudou = true; continue; }
+                    usando.push(k);
+                }
+                if (usando.length && corpo.liberar === true) {
+                    for (const k of usando) { const e = { ...pc[k] }; delete e[parte]; if (e.claude || e.git) pc[k] = e; else delete pc[k]; }
+                    mudou = true; usando.length = 0;
+                }
+                if (mudou) { dados.porConversa = pc; gravaDados(dados); }
+                if (usando.length) return responde(res, 409, { erro: `${usando.length === 1 ? '1 conversa usa' : usando.length + ' conversas usam'} isto.`, usos: usando.length, parte });
+            }
+            const r = await perfis.acao(corpo, perfilPendente);
+            return responde(res, 200, { ok: true, ...r });
+        } catch (e) { return responde(res, e.status || 500, { erro: e.status ? e.message : 'Não deu para mudar os perfis: ' + e.message }); }
     }
     if (url.pathname === '/api/reiniciar') {
         // Só funciona com o lançador (lancador.js), que sobe o servidor de novo quando ele sai
         // com o código 75. O servidor espera nada estar vivo; conversas paradas e sem agente
         // são fechadas, como no script seguro.
         if (!process.env.PAINEL_LANCADOR) return responde(res, 409, { erro: 'O painel não foi aberto pelo lançador. Rode o script de reinício uma vez.' });
+        // Já agendado pela troca de perfil: passa a ser também um reinício de código (cancelar a troca não o desfaz)
+        agendouPorPerfil = false;
         agendaReinicio(corpo.encerrar === true);
         return responde(res, 200, { ok: true, reinicioAgendado });
     }
@@ -1311,6 +2222,11 @@ const VENDOR = {
     '/vendor/xterm.js': ['@xterm/xterm/lib/xterm.js', 'text/javascript; charset=utf-8'],
     '/vendor/xterm.css': ['@xterm/xterm/css/xterm.css', 'text/css; charset=utf-8'],
     '/vendor/addon-fit.js': ['@xterm/addon-fit/lib/addon-fit.js', 'text/javascript; charset=utf-8'],
+    '/vendor/popper.js': ['@popperjs/core/dist/umd/popper.min.js', 'text/javascript; charset=utf-8'],
+    '/vendor/tippy.js': ['tippy.js/dist/tippy-bundle.umd.min.js', 'text/javascript; charset=utf-8'],
+    // Visualização de Markdown do Editor: os mesmos pacotes que o Monaco já usa (DOMPurify na versão corrigida do overrides)
+    '/vendor/marked.js': ['marked/lib/marked.umd.js', 'text/javascript; charset=utf-8'],
+    '/vendor/purify.js': ['dompurify/dist/purify.js', 'text/javascript; charset=utf-8'],
 };
 function pastaDoTerminal(cwd) {
     if (!cwd) return false;
@@ -1344,6 +2260,23 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(path.join(__dirname, 'favicon.svg')));
         }
+        // Formatador invisível (iframe da página principal): formata como o Alt+Shift+F do VS Code.
+        // Mesma CSP do editor (o Monaco traz um DOMPurify vulnerável), mas pode ser embutido pela própria origem.
+        if (url.pathname === '/formatador.html') {
+            res.writeHead(200, {
+                'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store',
+                'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'self'",
+            });
+            return res.end(fs.readFileSync(path.join(__dirname, 'formatador.html')));
+        }
+        if (url.pathname === '/formatador.js') {
+            res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+            return res.end(fs.readFileSync(path.join(__dirname, 'formatador.js')));
+        }
+        if (url.pathname === '/editor-md.js') {
+            res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
+            return res.end(fs.readFileSync(path.join(__dirname, 'editor-md.js')));
+        }
         if (url.pathname === '/editor.js') {
             res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(path.join(__dirname, 'editor.js')));
@@ -1363,7 +2296,30 @@ const servidor = http.createServer(async (req, res) => {
             // Caminho direto em node_modules (o "exports" dos pacotes pode bloquear o require.resolve)
             return res.end(fs.readFileSync(path.join(__dirname, 'node_modules', rel)));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila'].includes(url.pathname)) return await rotaChat(req, res, url);
+        // Ícone de arquivo (imagem estática da extensão; o <img> não manda o cabeçalho do painel)
+        // Imagem citada num .md (visualização do Editor): só imagem, só dentro de pasta conhecida, só com o token da página
+        if (req.method === 'GET' && url.pathname === '/api/editor/imagem') {
+            const TIPOS_IMG = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp', '.svg': 'image/svg+xml' };
+            const cwdImg = url.searchParams.get('cwd') || '';
+            if (url.searchParams.get('t') !== TOKEN || !pastaConhecida(cwdImg)) { res.writeHead(403); return res.end(); }
+            const raizImg = path.resolve(cwdImg);
+            const abs = path.resolve(raizImg, url.searchParams.get('caminho') || '');
+            const tipo = TIPOS_IMG[path.extname(abs).toLowerCase()];
+            if (!tipo || !abs.toLowerCase().startsWith(raizImg.toLowerCase() + path.sep)) { res.writeHead(404); return res.end(); }
+            let st;
+            try { st = fs.statSync(abs); } catch (e) { res.writeHead(404); return res.end(); }
+            if (!st.isFile() || st.size > 10 * 1024 * 1024) { res.writeHead(404); return res.end(); }
+            // SVG não roda script nem carrega nada de fora
+            res.writeHead(200, { 'Content-Type': tipo, 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox" });
+            return fs.createReadStream(abs).pipe(res);
+        }
+        if (req.method === 'GET' && url.pathname === '/icone-arquivo') {
+            const arq = iconeDoArquivo(url.searchParams.get('nome'), url.searchParams.get('tema'), url.searchParams.get('pasta') === '1', url.searchParams.get('aberta') === '1');
+            if (!arq || !fs.existsSync(arq)) { res.writeHead(404); return res.end(); }
+            res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+            return res.end(fs.readFileSync(arq));
+        }
+        if (url.pathname.startsWith('/api/chat/') || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/sessoes') return responde(res, 200, listaSessoes());
         if (url.pathname === '/api/uso') {
             const agora = Date.now();
@@ -1375,6 +2331,10 @@ const servidor = http.createServer(async (req, res) => {
                 await cacheUso.pedido;
             }
             return responde(res, 200, cacheUso.dados);
+        }
+        if (url.pathname === '/api/regras') {
+            const cwd = url.searchParams.get('cwd');
+            return responde(res, 200, regrasEAgentes(pastaConhecida(cwd) ? cwd : null));
         }
         if (url.pathname === '/api/config-modelos') {
             const cwd = url.searchParams.get('cwd');
@@ -1457,7 +2417,7 @@ const automatico = automacao.inicia({
 });
 
 // Terminal por WebSocket (só da própria página, em pastas conhecidas)
-terminal.liga(servidor, { porta: PORTA, token: TOKEN, pastaPermitida: pastaDoTerminal });
+terminal.liga(servidor, { porta: PORTA, token: TOKEN, pastaPermitida: pastaDoTerminal, envDaConversa: (chave) => { const [pj, ss] = chave.split('/'); return entradaDaConversa(pj, ss) ? envDeConversa(pj, ss) : null; } });
 
 // Só aceita conexão da própria máquina
 servidor.listen(PORTA, '127.0.0.1', () => {

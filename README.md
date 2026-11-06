@@ -110,6 +110,25 @@ O botão **ⓘ** (canto superior direito) mostra os detalhes da conversa: modelo
 
 Fechar a janela só a esconde na bandeja do sistema. Para encerrar o app de verdade, use **Sair** no ícone da bandeja.
 
+## Perfis (conta do Claude + identidade do Git)
+
+Funcionam como os perfis do navegador. O seletor ao lado do logo troca o Red Code inteiro de perfil. Monte os perfis em **Configurações › Perfis**.
+
+- **Conta do Claude:** cada conta tem a própria pasta, com login, configurações e conversas. Ela é usada pelo Claude Code por meio de `CLAUDE_CONFIG_DIR`.
+  - Ao criar, dá para copiar suas configurações da conta padrão: CLAUDE.md, hooks, agentes, skills, plugins e MCP.
+  - Login e conversas nunca são copiados.
+  - **Entrar** abre o `/login` do Claude num terminal.
+- **Identidade do Git:** nome e e-mail dos commits, mais o usuário do GitHub.
+  - O login do GitHub é feito pelo Git Credential Manager, guardado num espaço só da identidade (`credential.namespace`). O login de sempre não muda.
+  - Antes do primeiro login, **Verificar segurança** confirma isso: grava e apaga uma credencial falsa num endereço inventado.
+- **Perfil:** junta uma conta e uma identidade, por exemplo "Pessoal" ou "Claude pessoal + Git da empresa".
+  - O perfil **Padrão** é o Red Code de sempre, sem nenhuma variável.
+  - A lista de conversas mostra só as da conta do perfil em uso.
+  - Agendamentos e fila só rodam no perfil em que foram criados.
+- **Trocar de perfil** reinicia o servidor do Red Code assim que nenhuma conversa ou terminal estiver rodando. Dá para cancelar ou usar **Trocar agora**, que para tudo antes.
+- **Dados dos perfis** ficam em `%APPDATA%\Red Code\perfis`; a variável `PAINEL_PERFIS` troca esse caminho. Nenhum token fica nesse arquivo.
+- **Dentro de um perfil**, o `git config --global` grava num arquivo do Red Code que é refeito a cada subida.
+
 ## Onde ficam os dados
 
 - **App desktop:** favoritos, vínculos entre conversas, anexos e logs em `%APPDATA%\Red Code`. Trocar a pasta do app por uma versão nova não apaga esses dados.

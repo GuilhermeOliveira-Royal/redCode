@@ -5,9 +5,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-function roda(cmd, args, cwd) {
+async function roda(cmd, args, cwd) {
+    // gh do perfil: token da identidade só nesta chamada (não vai para o env do servidor nem do Claude)
+    const extra = cmd === 'gh' ? await require('./perfis').envGh() : {};
     return new Promise((resolve) => {
-        execFile(cmd, args, { cwd, timeout: 20000, windowsHide: true, maxBuffer: 2 * 1024 * 1024 }, (erro, saida, saidaErro) => {
+        execFile(cmd, args, { cwd, timeout: 20000, windowsHide: true, maxBuffer: 2 * 1024 * 1024, env: { ...process.env, ...extra } }, (erro, saida, saidaErro) => {
             resolve({ erro: erro ? (erro.code === 'ENOENT' ? 'ENOENT' : String(saidaErro || erro.message).trim()) : null, saida: String(saida || '') });
         });
     });
@@ -26,8 +28,8 @@ async function github(cwd) {
 // Hooks configurados (seus, locais e do projeto): o que roda e quando
 function hooks(cwd) {
     const fontes = [
-        ['seu', path.join(os.homedir(), '.claude', 'settings.json')],
-        ['seu (local)', path.join(os.homedir(), '.claude', 'settings.local.json')],
+        ['seu', path.join(require('./perfis').pastaClaude(), 'settings.json')],
+        ['seu (local)', path.join(require('./perfis').pastaClaude(), 'settings.local.json')],
     ];
     if (cwd) fontes.push(['projeto', path.join(cwd, '.claude', 'settings.json')], ['projeto (local)', path.join(cwd, '.claude', 'settings.local.json')]);
     const lista = [];

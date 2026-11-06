@@ -1,0 +1,16 @@
+node_modules/
+dist/
+
+# Dados pessoais e de uso (ficam em cada PC)
+dados.json
+anexos/
+desktop/janela.json
+desktop/navegador.json
+desktop/*.log
+desktop/red-code.ico
+
+# Testes e sobras
+teste-chat/
+ANDAMENTO-*.txt
+*.mojibake-bak
+/+

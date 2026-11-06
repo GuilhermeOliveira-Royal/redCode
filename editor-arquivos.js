@@ -153,4 +153,4 @@ function diagnosticos(cwd, caminho) {
     });
 }
 
-module.exports = { arvore, ler, salvar, diagnosticos, dentroDaPasta };
+module.exports = { arvore, ler, salvar, diagnosticos, dentroDaPasta, utf8Valido, decodifica1252 };

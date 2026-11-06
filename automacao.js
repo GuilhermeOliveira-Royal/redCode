@@ -37,7 +37,7 @@ function validaAgendamentos(lista, pastaConhecida, anteriores = []) {
         }
         const id = /^[a-f0-9]{12}$/.test(String(a.id)) ? a.id : crypto.randomBytes(6).toString('hex');
         const antes = anteriores.find(x => x.id === id);
-        return { id, nome, ...base, quando, ativo: a.ativo !== false, ultima: antes ? antes.ultima : null, criado: antes ? antes.criado : new Date().toISOString() };
+        return { id, nome, ...base, quando, ativo: a.ativo !== false, ultima: antes ? antes.ultima : null, criado: antes ? antes.criado : new Date().toISOString(), perfil: perfilEmUso() };
     });
 }
 
@@ -62,6 +62,10 @@ function validaFila(lista, pastaConhecida) {
     if (!Array.isArray(lista) || lista.length > 50) throw new Error('Até 50 itens na fila.');
     return lista;
 }
+
+// Perfil do servidor em execução (env, nunca o perfis.json): só dispara o que é dele
+const perfilEmUso = () => process.env.PAINEL_PERFIL || 'padrao';
+const doPerfil = (x) => (x.perfil || 'padrao') === perfilEmUso();
 
 const PRAZO_PERMISSAO_MS = 3 * 60 * 60 * 1000;   // execução parada num cartão de permissão por 3 h é encerrada
 
@@ -117,7 +121,7 @@ function inicia({ leDados, gravaDados, pastaConhecida, chat, garanteUso, bloquea
         // Reinício seguro agendado: não começa nada novo (senão ele nunca acontece)
         const podeDisparar = !bloqueado() && await usoPermite();
         if (!rodandoAgendada && podeDisparar) {
-            const a = (dados.agendamentos || []).find(x => venceu(x) && pastaConhecida(x.cwd));
+            const a = (dados.agendamentos || []).find(x => doPerfil(x) && venceu(x) && pastaConhecida(x.cwd));
             if (a) await rodaAgendada(a.id);
         }
         // 2) Fila: um item por vez; pausa com o limite de 5 h acima de 90% ou uso indisponível
@@ -136,7 +140,7 @@ function inicia({ leDados, gravaDados, pastaConhecida, chat, garanteUso, bloquea
             return;
         }
         if (dados.filaPausada || !podeDisparar) return;
-        const prox = fila.find(i => i.status === 'esperando');
+        const prox = fila.find(i => i.status === 'esperando' && doPerfil(i));
         if (!prox) return;
         try {
             const pedido = validaPedido(prox, pastaConhecida);
@@ -156,6 +160,7 @@ function inicia({ leDados, gravaDados, pastaConhecida, chat, garanteUso, bloquea
         const d = leDados();
         const a = (d.agendamentos || []).find(x => x.id === id);
         if (!a) throw new Error('Tarefa não encontrada.');
+        if (!doPerfil(a)) throw new Error('Esta tarefa é de outro perfil: troque para ele para rodar.');
         const pedido = validaPedido(a, pastaConhecida);
         // Reserva a vez ANTES de esperar o início da conversa (dois cliques ou dois ciclos não disparam duas)
         rodandoAgendada = { id, chave: null };
@@ -183,4 +188,4 @@ function inicia({ leDados, gravaDados, pastaConhecida, chat, garanteUso, bloquea
     return { rodaAgendada, ciclo: async () => { if (emCiclo) return; emCiclo = true; try { await ciclo(); } finally { emCiclo = false; } }, emAndamento: () => rodandoAgendada };
 }
 
-module.exports = { inicia, validaAgendamentos, validaPedido, validaFila, venceu };
+module.exports = { inicia, validaAgendamentos, validaPedido, validaFila, venceu, doPerfil };

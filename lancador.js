@@ -6,11 +6,17 @@ const path = require('path');
 
 const CODIGO_REINICIO = 75;
 
+function envDoPerfilAtivo() {
+    try { const perfis = require('./perfis'); return perfis.envDoPerfil(perfis.le().ativo); }
+    catch (e) { return {}; }
+}
+
 function sobe() {
     const servidor = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
         cwd: __dirname,
         stdio: 'inherit',
-        env: { ...process.env, PAINEL_LANCADOR: '1' },
+        // Perfil ativo (conta do Claude + identidade do Git): recalculado a cada subida
+        env: { ...process.env, ...envDoPerfilAtivo(), PAINEL_LANCADOR: '1' },
     });
     servidor.on('exit', (codigo, sinal) => {
         if (codigo === CODIGO_REINICIO) {

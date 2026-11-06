@@ -23,11 +23,15 @@ function erro(status, mensagem) { const e = new Error(mensagem); e.status = stat
 // - LITERAL_PATHSPECS: caminho é caminho (um arquivo chamado "*" ou ":(top)" não vira curinga)
 // - OPTIONAL_LOCKS=0: leituras não pegam o index.lock (não atrapalham o Claude nem o VS Code)
 // - TERMINAL_PROMPT=0: sem credencial, falha na hora em vez de esperar um prompt invisível
+// Git do painel na identidade da conversa: a rota roda dentro de contextoGit.run({ env, idIdentidade }, ...)
+const { AsyncLocalStorage } = require('async_hooks');
+const contextoGit = new AsyncLocalStorage();
+const envBaseGit = () => { const c = contextoGit.getStore(); return c && c.env ? c.env : process.env; };
 const AMBIENTE_GIT = { GIT_LITERAL_PATHSPECS: '1', GIT_OPTIONAL_LOCKS: '0', GIT_TERMINAL_PROMPT: '0' };
 let ultimaSaida = '';   // saída do último comando (ex.: linhas dos hooks do repo), para mostrar ao usuário
 function git(args, cwd, { tempo = 30000, buffer = false, entrada, literal = true } = {}) {
     return new Promise((resolve, rejeita) => {
-        const filho = execFile(GIT_EXE, args, { cwd, timeout: tempo, windowsHide: true, maxBuffer: 8 * 1024 * 1024, encoding: buffer ? 'buffer' : 'utf8', env: { ...process.env, ...AMBIENTE_GIT, ...(literal ? {} : { GIT_LITERAL_PATHSPECS: '0' }) } }, (falha, saida, saidaErro) => {
+        const filho = execFile(GIT_EXE, args, { cwd, timeout: tempo, windowsHide: true, maxBuffer: 8 * 1024 * 1024, encoding: buffer ? 'buffer' : 'utf8', env: { ...envBaseGit(), ...AMBIENTE_GIT, ...(literal ? {} : { GIT_LITERAL_PATHSPECS: '0' }) } }, (falha, saida, saidaErro) => {
             // Hooks (ex.: commit-msg do Royal) explicam a recusa no stdout: devolve as duas saídas
             const junto = [buffer ? '' : String(saida || ''), String(saidaErro || '')].join('\n').trim();
             if (falha) return rejeita(erro(400, (falha.killed ? 'O git demorou demais e foi interrompido.\n' : '') + (junto.split('\n').slice(-25).join('\n') || falha.message)));
@@ -127,13 +131,66 @@ async function log(cwd, n) {
     const raiz = await raizDo(cwd);
     if (!raiz) throw erro(400, 'Não é um repositório git.');
     const qtd = Math.max(20, Math.min(300, Number(n) || 150));
-    const saida = await git(['log', '--branches', '--remotes', '--tags', 'HEAD', '--graph', '--date-order', `-n${qtd}`, '--format=%x1f%H%x1f%h%x1f%an%x1f%ar%x1f%D%x1f%s'], raiz, { buffer: true });
+    // Sem --graph: o painel desenha as faixas a partir dos pais (%P) de cada commit
+    const saida = await git(['log', '--branches', '--remotes', '--tags', 'HEAD', '--date-order', `-n${qtd}`, '--format=%x1f%H%x1f%h%x1f%an%x1f%ae%x1f%ar%x1f%D%x1f%P%x1f%s'], raiz, { buffer: true });
     return texto(saida).split(/\r?\n/).filter(Boolean).map(l => {
         const i = l.indexOf('\x1f');
         if (i < 0) return { grafo: l };
-        const [hash, curto, autor, quando, refs, assunto] = l.slice(i + 1).split('\x1f');
-        return { grafo: l.slice(0, i), hash, curto, autor, quando, refs: refs ? refs.split(', ').filter(Boolean) : [], assunto };
+        const [hash, curto, autor, email, quando, refs, pais, assunto] = l.slice(i + 1).split('\x1f');
+        return { hash, curto, autor, email, quando, refs: refs ? refs.split(', ').filter(Boolean) : [], pais: pais ? pais.split(' ').filter(Boolean) : [], assunto };
     });
+}
+// Foto do autor: o gh pergunta ao GitHub quem fez o commit (o repositório pode ser privado) e a foto
+// fica em cache em %APPDATA%\Red Code\avatars (uma consulta por pessoa). Sem gh/login: null (fica a inicial).
+const PASTA_AVATARES = require('path').join(process.env.APPDATA || require('os').homedir(), 'Red Code', 'avatars');
+const avataresEmAndamento = new Map();
+function baixaImagem(url, voltas = 0) {
+    return new Promise((resolve) => {
+        require('https').get(url, { headers: { 'User-Agent': 'red-code' }, timeout: 10000 }, (r) => {
+            if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location && voltas < 3) { r.resume(); return resolve(baixaImagem(r.headers.location, voltas + 1)); }
+            if (r.statusCode !== 200 || !/^image\//.test(r.headers['content-type'] || '')) { r.resume(); return resolve(null); }
+            const partes = []; let total = 0;
+            r.on('data', (c) => { total += c.length; if (total < 300000) partes.push(c); });
+            r.on('end', () => resolve(total < 300000 ? { tipo: r.headers['content-type'], dados: Buffer.concat(partes) } : null));
+        }).on('error', () => resolve(null)).on('timeout', function () { this.destroy(); resolve(null); });
+    });
+}
+async function avatar(cwd, email, hash) {
+    email = String(email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+$/.test(email) || !/^[0-9a-f]{7,40}$/i.test(String(hash || ''))) return null;
+    const raiz = await raizDo(cwd);
+    if (!raiz) return null;
+    // "Sem foto" é por perfil (outra conta pode não ver o repositório); a foto em si serve para todos
+    const chave = require('crypto').createHash('sha1').update(email).digest('hex');
+    const ctxAv = contextoGit.getStore();
+    const perfil = ctxAv && ctxAv.idIdentidade ? 'id-' + ctxAv.idIdentidade : require('./perfis').perfilEmUso();
+    const arqSem = perfil === 'padrao' ? null : require('path').join(PASTA_AVATARES, chave + '.' + perfil + '.json');
+    const arq = require('path').join(PASTA_AVATARES, chave + '.json');
+    for (const a of [arq, arqSem].filter(Boolean)) {
+        try {
+            const c = JSON.parse(fs.readFileSync(a, 'utf8'));
+            if (c.dataUrl) return c.dataUrl;
+            // Sem foto: tenta de novo depois de 1 h (gh ausente) ou 1 dia (o GitHub não tem foto); só vale o do próprio perfil
+            if ((a === arq) === !arqSem && Date.now() - c.em < (c.semGh ? 3600e3 : 86400e3)) return null;
+        } catch (e) { /* sem cache */ }
+    }
+    const chaveBusca = chave + '|' + perfil;
+    if (avataresEmAndamento.has(chaveBusca)) return avataresEmAndamento.get(chaveBusca);
+    const busca = (async () => {
+        const ctx = contextoGit.getStore();
+        const envGh = ctx && ctx.idIdentidade ? await require('./perfis').envGhDaIdentidade(ctx.idIdentidade) : await require('./perfis').envGh();
+        const r = await new Promise((resolve) => require('child_process').execFile('gh', ['api', `repos/{owner}/{repo}/commits/${hash}`, '--jq', '.author.avatar_url'], { cwd: raiz, timeout: 15000, windowsHide: true, env: { ...envBaseGit(), ...envGh } }, (erro, saida) => resolve({ erro, saida: String(saida || '').trim() })));
+        const semGh = !!(r.erro && (r.erro.code === 'ENOENT' || /auth|login/i.test(String(r.erro.message))));
+        let dataUrl = null;
+        if (!r.erro && /^https:\/\/avatars\.githubusercontent\.com\//.test(r.saida)) {
+            const img = await baixaImagem(r.saida + (r.saida.includes('?') ? '&' : '?') + 's=64');
+            if (img) dataUrl = `data:${img.tipo};base64,${img.dados.toString('base64')}`;
+        }
+        try { fs.mkdirSync(PASTA_AVATARES, { recursive: true }); fs.writeFileSync(dataUrl || !arqSem ? arq : arqSem, JSON.stringify({ email, dataUrl, semGh, em: Date.now() })); } catch (e) { /* sem cache em disco */ }
+        return dataUrl;
+    })();
+    avataresEmAndamento.set(chaveBusca, busca);
+    try { return await busca; } finally { avataresEmAndamento.delete(chaveBusca); }
 }
 async function commit(cwd, hash, arquivo) {
     const raiz = await raizDo(cwd);
@@ -143,6 +200,14 @@ async function commit(cwd, hash, arquivo) {
     const cab = await git(['show', '--no-color', '-s', '--format=%H%x1f%an <%ae>%x1f%ad%x1f%D%x1f%B', '--date=format:%d/%m/%Y %H:%M', hash], raiz);
     const [h, autor, data, refs, corpo] = cab.split('\x1f');
     const arquivos = (await git(['show', '--no-color', '--format=', '--name-status', hash], raiz)).split(/\r?\n/).filter(Boolean).map(l => { const p = l.split('\t'); return { letra: p[0][0], caminho: p[p.length - 1] }; });
+    // Linhas somadas e tiradas (mesma ordem do --name-status; binário vem como "-")
+    const numeros = (await git(['show', '--no-color', '--format=', '--numstat', hash], raiz).catch(() => '')).split(/\r?\n/).filter(Boolean).map(l => l.split('\t'));
+    arquivos.forEach((a, i) => {
+        const n = numeros[i];
+        if (!n) return;
+        a.mais = n[0] === '-' ? null : Number(n[0]);
+        a.menos = n[1] === '-' ? null : Number(n[1]);
+    });
     return { hash: h, autor, data, refs, mensagem: (corpo || '').trim(), arquivos };
 }
 
@@ -260,4 +325,4 @@ async function paraLixeira(caminhos) {
     if (sobrou.length) throw erro(500, 'Não consegui mandar para a Lixeira: ' + sobrou.map(c => path.basename(c)).join(', '));
 }
 
-module.exports = { estado, diff, log, commit, branches, acao, aSubir, hooksComEfeito };
+module.exports = { contextoGit, avatar, estado, diff, log, commit, branches, acao, aSubir, hooksComEfeito };

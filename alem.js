@@ -28,7 +28,12 @@ async function busca(sessoes, raiz, termo, tipo, { limite = 80, tempoMs = 9000 }
         }
     };
     const umaSessao = async (s) => {
-        const arquivo = path.join(raiz, s.projeto, s.id + '.jsonl');
+        // raiz pode ser a pasta projects/ ou uma função que acha o arquivo da conversa (conversas de outras contas)
+        const arquivo = typeof raiz === 'function' ? raiz(s) : path.join(raiz, s.projeto, s.id + '.jsonl');
+        if (!arquivo || !fs.existsSync(arquivo)) return;
+        try { await leUmaSessao(s, arquivo); } catch (e) { /* arquivo sumiu ou não deu para ler: segue com as outras */ }
+    };
+    const leUmaSessao = async (s, arquivo) => {
         let porSessao = 0;
         const rl = readline.createInterface({ input: fs.createReadStream(arquivo, { encoding: 'utf8', highWaterMark: 1 << 20 }), crlfDelay: Infinity });
         for await (const linha of rl) {

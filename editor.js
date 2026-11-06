@@ -95,6 +95,7 @@ function ativa(aba) {
     document.title = `${aba.rel} · Editor`;
     mostraAviso(aba.eol === 'misto' ? 'Este arquivo mistura fins de linha CRLF e LF. Ao salvar, tudo vira CRLF.' : '');
     desenhaAbas(); desenhaProblemas();
+    if (window.mdAbaAtivada) window.mdAbaAtivada(aba);
     document.querySelectorAll('.no.atual').forEach(n => n.classList.remove('atual'));
     document.querySelector(`[data-arquivo="${CSS.escape(aba.rel)}"]`)?.classList.add('atual');
 }
@@ -116,7 +117,7 @@ function fechaAba(aba) {
     const i = abas.indexOf(aba);
     abas.splice(i, 1);
     aba.modelo.dispose();
-    if (atual === aba) { atual = null; if (abas.length) ativa(abas[Math.max(0, i - 1)]); else { $('editor').hidden = true; $('vazio').hidden = false; $('stCaminho').textContent = ''; } }
+    if (atual === aba) { atual = null; if (abas.length) ativa(abas[Math.max(0, i - 1)]); else { $('editor').hidden = true; $('previa').hidden = true; $('btnMdLado').hidden = true; $('btnMdSo').hidden = true; $('area').dataset.modo = 'codigo'; $('vazio').hidden = false; $('stCaminho').textContent = ''; } }
     desenhaAbas(); mostraAviso('');
 }
 function mostraAviso(texto, botoes = []) {
@@ -229,6 +230,11 @@ canal.addEventListener('message', (ev) => {
     if (m.tipo === 'ping-editor' && m.cwd === CWD) canal.postMessage({ tipo: 'pong-editor', cwd: CWD });
     if (m.tipo === 'abrir' && m.cwd === CWD) { window.painelDesktop?.mostrar?.(); window.focus(); if (m.arquivo) abreArquivo(m.arquivo, m.linha); }
 });
+
+// Para a visualização de Markdown (editor-md.js)
+window.abaAtualEditor = () => atual;
+window.editorMonaco = () => editor;
+window.abreArquivoEditor = (rel, linha) => abreArquivo(rel, linha);
 
 // ---------- Início ----------
 (async () => {
