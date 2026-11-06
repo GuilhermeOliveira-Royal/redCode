@@ -1441,6 +1441,27 @@ body.sessao-chat #btnTerminal, body.sessao-chat .seletor-modo, body.sessao-chat 
 /* Telas estreitas: a pílula minimizada continua presa no rodapé (senão ocupa a largura toda e fica sob o seletor de perfil) */
 @media (max-width: 1100px) { .uso-plano.minimizado { position: fixed; margin: 0; width: auto; bottom: 10px; left: 10px; } }
 .chip-perfil:hover { background: var(--realce); }
+/* Rodapé da lista: a lista termina acima dele (a barra de rolagem não passa por baixo das pílulas) */
+.lista { padding-bottom: 12px; }
+.rodape-sessoes { flex: none; border-top: 1px solid var(--linha); padding: 8px 10px 0; }
+.rodape-pilulas { height: 49px; }
+body.lista-escondida .rodape-sessoes { display: none; }
+/* Player do que está tocando no Windows */
+.player-midia { position: relative; overflow: hidden; display: flex; align-items: center; gap: 9px; padding: 7px 5px 9px 7px; border: 1px solid var(--linha); border-radius: 11px; background: var(--folha); animation: playerEntra .35s cubic-bezier(.2, .8, .2, 1); }
+@keyframes playerEntra { from { opacity: 0; transform: translateY(6px); } }
+.player-midia .pm-capa { width: 36px; height: 36px; flex: none; border-radius: 7px; object-fit: cover; background: var(--realce); }
+.player-midia .pm-capa.sem { display: grid; place-items: center; color: var(--grafite); }
+.player-midia .pm-textos { flex: 1; min-width: 0; }
+.player-midia .pm-titulo { font: 600 12.5px/1.25 var(--sans); color: var(--tinta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-midia .pm-artista { font-size: 11.5px; line-height: 1.3; color: var(--grafite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-midia .pm-btn { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: var(--tinta); transition: background .15s, transform .15s; }
+.player-midia .pm-btn:hover { background: var(--realce); }
+.player-midia .pm-btn:active { transform: scale(.9); }
+.player-midia .pm-btn:disabled { opacity: .35; pointer-events: none; }
+.player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--voce); transition: width 1s linear; }
+.player-midia.pausado .pm-prog { opacity: .45; }
+/* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
+body.com-player .uso-plano:not(.minimizado) { bottom: 116px; }
 .chip-perfil .perfil-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-perfil .perfil-seta { color: var(--atencao); white-space: nowrap; }
 .chip-perfil.pendente { border-color: var(--atencao); animation: perfilPisca 1.6s ease-in-out infinite; }
@@ -1490,7 +1511,19 @@ body.sessao-chat #btnTerminal, body.sessao-chat .seletor-modo, body.sessao-chat 
 .vaga-vazio { font-size: 13px; color: var(--grafite); }
 .vaga-quem small { color: var(--grafite); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vaga-acoes { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: auto; }
-.vaga-escolhe { flex: 1; min-width: 0; font: 12px var(--sans); padding: 3px 6px; border: 1px solid var(--linha); border-radius: 7px; background: var(--folha); color: var(--tinta); }
+/* Escolher conta/identidade: linha própria embaixo (alinha entre os dois cartões), seta do app e reticências */
+.vaga-escolhe { flex: 1 1 100%; min-width: 0; box-sizing: border-box; height: 30px; padding: 0 28px 0 9px; font: 12px var(--sans); color: var(--tinta); border: 1px solid var(--linha); border-radius: 8px; background: var(--folha) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5l3 3 3-3' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 10px; -webkit-appearance: none; appearance: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.vaga-escolhe:hover { border-color: color-mix(in srgb, var(--tinta) 28%, var(--linha)); }
+.vaga-escolhe:focus-visible { outline: none; border-color: var(--voce); box-shadow: 0 0 0 2px color-mix(in srgb, var(--voce) 22%, transparent); }
+.vaga-escolhe option { background: var(--folha); color: var(--tinta); }
+.vaga-acoes .mini { height: 28px; box-sizing: border-box; padding: 0 10px; border-color: var(--linha); }
+.vaga-acoes .mini:hover { background: var(--realce); color: var(--tinta); }
+.limite-esforco { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--grafite); white-space: nowrap; }
+.config-agente-acoes .limite-esforco + .mini.perigo { margin-left: 4px; }
+.limite-esforco select { flex: none; width: 118px; height: 28px; box-sizing: border-box; padding: 0 28px 0 9px; font: 12.5px var(--sans); color: var(--tinta); border: 1px solid var(--linha); border-radius: 8px; background: var(--folha) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5l3 3 3-3' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center / 10px; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.limite-esforco select:focus-visible { outline: none; border-color: var(--voce); box-shadow: 0 0 0 2px color-mix(in srgb, var(--voce) 22%, transparent); }
+.limite-esforco select option { background: var(--folha); color: var(--tinta); }
+.esforco-limitado { color: var(--atencao); }
 .perfil-cartao2 .mini.principal { background: var(--voce); border-color: var(--voce); color: #fff; font-weight: 600; }
 .perfil-cartao2 .mini.principal:hover { filter: brightness(1.08); }
 .perfil-cadastro { margin-top: 18px; }
@@ -1790,6 +1823,10 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         <div class="aviso-versao" id="avisoVersao" role="status" hidden></div>
         <div class="resumo-status" id="resumoStatus" aria-live="polite"></div>
         <div class="lista" id="listaSessoes"></div>
+        <div class="rodape-sessoes" id="rodapeSessoes">
+            <div class="player-midia" id="playerMidia" hidden></div>
+            <div class="rodape-pilulas" aria-hidden="true"></div>
+        </div>
     </nav>
     <section class="editor-vivo" id="editorVivo" hidden aria-label="Editor: o que o Claude está editando">
         <div class="ev-topo"><div class="ev-abas" id="evAbas"></div>
@@ -2300,6 +2337,89 @@ document.getElementById('avisoVersao').addEventListener('click', async (ev) => {
 });
 verificaVersao();
 setInterval(verificaVersao, 15000);
+
+/* ---------- Player do rodapé: o que está tocando no Windows (Spotify, YouTube no navegador...) ---------- */
+const playerMidia = document.getElementById('playerMidia');
+const ICONE_MIDIA = {
+    play: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M4.5 2.8v10.4c0 .5.6.8 1 .5l8-5.2a.6.6 0 0 0 0-1L5.5 2.3c-.4-.3-1 0-1 .5z"/></svg>',
+    pausa: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>',
+    proxima: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2.5 3.2v9.6c0 .5.5.8.9.5L10 8.5a.6.6 0 0 0 0-1L3.4 2.7c-.4-.3-.9 0-.9.5z"/><rect x="11.2" y="2.6" width="2.3" height="10.8" rx=".9"/></svg>',
+    nota: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 12.2a2 2 0 1 1-1.2-1.8V3.6l7.5-1.5v8.1a2 2 0 1 1-1.2-1.8V4.1L6 5.1z"/></svg>',
+};
+let midiaAtual = null, capaMostrada = -1, semMidiaDesde = 0;
+// "Brave._crx_..." / "Spotify.exe" / "Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic" -> nome curto do app
+const nomeAppMidia = (id) => { const n = String(id || '').split(/[.!_]/)[0]; return n ? n[0].toUpperCase() + n.slice(1) : ''; };
+function montaPlayer() {
+    playerMidia.innerHTML = `<span class="pm-capa sem">${ICONE_MIDIA.nota}</span>
+        <div class="pm-textos"><div class="pm-titulo"></div><div class="pm-artista"></div></div>
+        <button type="button" class="pm-btn" data-midia="alternar"></button>
+        <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
+        <span class="pm-prog"></span>`;
+}
+function desenhaMidia() {
+    const m = midiaAtual;
+    if (!m || m.nada || m.erro || !m.titulo) {
+        // Na troca de música o Windows passa um instante sem nada: espera 5 s antes de esconder
+        if (!semMidiaDesde) semMidiaDesde = Date.now();
+        if (Date.now() - semMidiaDesde < 5000 && !playerMidia.hidden) return;
+        playerMidia.hidden = true; document.body.classList.remove('com-player'); return;
+    }
+    semMidiaDesde = 0;
+    if (!playerMidia.firstChild) montaPlayer();
+    const tocando = m.estado === 'Playing';
+    const artista = [m.artista, m.album].filter(Boolean).join(' · ');
+    playerMidia.querySelector('.pm-titulo').textContent = m.titulo;
+    playerMidia.querySelector('.pm-artista').textContent = artista;
+    playerMidia.querySelector('.pm-textos').title = m.titulo + (m.artista ? ' — ' + m.artista : '') + (nomeAppMidia(m.app) ? '\nTocando no ' + nomeAppMidia(m.app) : '');
+    // Capa: só troca a imagem quando a música muda
+    if (m.capa !== capaMostrada) {
+        capaMostrada = m.capa;
+        const atual = playerMidia.querySelector('.pm-capa');
+        const nova = m.capa ? Object.assign(document.createElement('img'), { className: 'pm-capa', alt: '', src: `/api/midia/capa?t=${TOKEN_PAINEL}&v=${m.capa}` }) : Object.assign(document.createElement('span'), { className: 'pm-capa sem', innerHTML: ICONE_MIDIA.nota });
+        atual.replaceWith(nova);
+    }
+    const alternar = playerMidia.querySelector('[data-midia="alternar"]');
+    alternar.innerHTML = tocando ? ICONE_MIDIA.pausa : ICONE_MIDIA.play;
+    alternar.title = tocando ? 'Pausar' : 'Tocar';
+    alternar.setAttribute('aria-label', alternar.title);
+    alternar.disabled = m.podeAlternar === false;
+    playerMidia.querySelector('[data-midia="proxima"]').disabled = m.podeProxima === false;
+    playerMidia.classList.toggle('pausado', !tocando);
+    playerMidia.hidden = false;
+    document.body.classList.add('com-player');
+    andaProgresso();
+}
+// Posição: a do Windows + o tempo que passou desde a última atualização (se estiver tocando)
+function andaProgresso() {
+    const m = midiaAtual, barra = playerMidia.querySelector('.pm-prog');
+    if (!barra) return;
+    if (!m || !(m.duracao > 1)) { barra.hidden = true; return; }
+    const base = m.atualizadoEm > 0 ? m.atualizadoEm : m.lidoEm;
+    const pos = m.posicao + (m.estado === 'Playing' ? Math.max(0, (Date.now() - base) / 1000) : 0);
+    barra.hidden = false;
+    barra.style.width = Math.min(100, Math.max(0, pos / m.duracao * 100)).toFixed(2) + '%';
+}
+async function atualizaMidia() {
+    if (document.hidden || JANELA_SECUNDARIA) return;
+    let m;
+    try { m = await getPainel('/api/midia'); } catch (e) { return; }
+    if (m && !m.nada && !m.erro && m.titulo) midiaAtual = m;
+    else if (midiaAtual && (!semMidiaDesde || Date.now() - semMidiaDesde < 5000)) { if (!semMidiaDesde) semMidiaDesde = Date.now(); return; }
+    else midiaAtual = m;
+    desenhaMidia();
+}
+playerMidia.addEventListener('click', async (ev) => {
+    const b = ev.target.closest('[data-midia]');
+    if (!b) return;
+    // Resposta imediata no botão; a leitura seguinte confirma o estado real
+    if (b.dataset.midia === 'alternar' && midiaAtual) { midiaAtual.estado = midiaAtual.estado === 'Playing' ? 'Paused' : 'Playing'; midiaAtual.atualizadoEm = Date.now(); desenhaMidia(); }
+    try { await api('/api/midia', { acao: b.dataset.midia }); } catch (e) { recado(e.message); }
+    setTimeout(atualizaMidia, 700);
+});
+setInterval(atualizaMidia, 2000);
+setInterval(() => { if (!playerMidia.hidden && !document.hidden) andaProgresso(); }, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizaMidia(); });
+setTimeout(atualizaMidia, 0);
 
 /* ---------- Limites de uso do plano (rodapé da lista) ---------- */
 function quandoReinicia(iso) {
@@ -5296,7 +5416,7 @@ function cartaoAgenteConfig(a) {
     const etiquetas = (a.ativo ? '' : a.soParaVoce ? '<span class="etiqueta" title="Desativado só no seu computador (settings.local.json do projeto, fora do git). Para os outros continua ativo.">desativado só para você</span>' : '<span class="etiqueta">desativado</span>') + (a.sobrepoe ? '<span class="etiqueta" title="Neste projeto vale este, não o seu de mesmo nome">substitui o seu</span>' : '');
     return `<div class="config-agente ${a.ativo ? '' : 'inativo'}" data-arquivo="${esc(a.arquivo)}" data-busca="${esc(semAcento(a.nome + ' ' + a.descricao + ' ' + a.ferramentas.join(' ')))}">
         <div class="config-agente-cab">${petMini(a.nome, false)}<b>${esc(a.nome)}</b>${etiquetas}
-            <span class="config-agente-modelo">${esc(rotuloModeloAgente(a.modelo))}${a.esforco ? ' · ' + esc(a.esforco) : ''}</span>
+            <span class="config-agente-modelo">${esc(rotuloModeloAgente(a.modelo))}${a.esforco ? ' · ' + esc(a.esforco) : ''}${a.esforcoOriginal ? ` <span class="esforco-limitado" title="Limitado pelo esforço máximo deste computador. O arquivo pedia ${esc(a.esforcoOriginal)}; volta sozinho se você subir ou tirar o limite.">(era ${esc(a.esforcoOriginal)})</span>` : ''}</span>
             <label class="config-chave" title="${a.ativo ? (a.escopo === 'projeto' ? 'Ativo. Desativar vale só para você: o arquivo do projeto não muda' : 'Ativo: o Claude pode chamar') : (a.escopo === 'projeto' ? 'Desativado só para você: o Claude não chama este agente no seu computador' : 'Desativado: o Claude não vê este agente')}"><input type="checkbox" data-agente-ativo ${a.ativo ? 'checked' : ''} aria-label="Agente ativo"><span></span></label>
         </div>
         <p>${esc(a.descricao || 'Sem descrição.')}</p>
@@ -5304,6 +5424,7 @@ function cartaoAgenteConfig(a) {
         <div class="config-agente-acoes">
             ${a.editavel ? '<button class="mini" data-agente-editar>Editar</button>' : `<small class="nota">${a.cortado ? 'Arquivo grande: edite pelo VS Code.' : 'Nome de arquivo fora do padrão: edite pelo VS Code.'}</small>`}
             <button class="mini" data-abrir-regra="${esc(a.arquivo)}" title="${esc(a.arquivo)}">Abrir no VS Code</button>
+            ${limiteEsforcoAgente(a)}
             <button class="mini perigo" data-agente-apagar>Apagar</button>
         </div>
     </div>`;
@@ -5325,6 +5446,14 @@ function formAgente(a, escopos) {
         ${!novo && a.escopo === 'projeto' ? '<p class="nota">Este arquivo é do projeto: a mudança aparece no git dele.</p>' : ''}
         <div class="config-agente-acoes"><button class="botao principal" data-agente-salvar>${novo ? 'Criar agente' : 'Salvar'}</button><button class="mini" data-agente-cancelar>Cancelar</button></div>
     </div>`;
+}
+// Esforço máximo deste agente neste computador (ex.: em casa, plano menor: Haiku livre, Opus no baixo)
+function limiteEsforcoAgente(a) {
+    if (a.escopo !== 'seu' || !(a.esforco || a.esforcoOriginal)) return '';
+    const opcoes = [['', 'Sem limite'], ['high', 'Alto'], ['medium', 'Médio'], ['low', 'Baixo']];
+    return `<label class="limite-esforco" title="Esforço máximo deste agente neste computador. Se o arquivo pedir mais, ele usa o limite (vale também no VS Code). O Red Code guarda o original, que volta quando você subir ou tirar o limite.">Máximo neste PC
+            <select data-limite-esforco aria-label="Esforço máximo de ${esc(a.nome)} neste computador">${opcoes.map(([v, n]) => `<option value="${v}" ${(a.limiteEsforco || '') === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+        </label>`;
 }
 function desenhaRegras(r, cwd) {
     regrasAtuais = r;
@@ -5360,6 +5489,11 @@ async function mudaAgente(corpo, recadoOk) {
 }
 const camposDoForm = (form) => Object.fromEntries([...form.querySelectorAll('[data-campo]')].map(c => [c.dataset.campo, c.value]));
 janelaConfig.addEventListener('change', (evt) => {
+    const limite = evt.target.closest('[data-limite-esforco]');
+    if (limite) {
+        const cartao = limite.closest('[data-arquivo]'), nome = cartao.querySelector('.config-agente-cab b').textContent;
+        return mudaAgente({ acao: 'limite-esforco', arquivo: cartao.dataset.arquivo, limite: limite.value }, limite.value ? `${nome}: no máximo ${limite.selectedOptions[0].textContent.toLowerCase()} neste computador` : `${nome}: sem limite de esforço`);
+    }
     const ativo = evt.target.closest('[data-agente-ativo]');
     if (!ativo) return;
     const arq = ativo.closest('[data-arquivo]').dataset.arquivo;

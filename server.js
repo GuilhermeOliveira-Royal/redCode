@@ -17,6 +17,7 @@ const automacao = require('./automacao');
 const gitScm = require('./git-scm');
 const chat = require('./chat');
 const perfis = require('./perfis');
+const midia = require('./midia');
 // Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
 const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
 // Primeiro nome do usuário do Windows (henrique.freitas -> Henrique), para a saudação do Chat
@@ -1470,8 +1471,56 @@ function backupArquivoAgente(abs) {
     fs.copyFileSync(abs, destino);
     return destino;
 }
+// Esforço máximo de cada um dos seus agentes (~/.claude/agents) neste computador: para plano menor (ex.: em casa,
+// Haiku livre e Opus no baixo). Quem passa do limite tem o "effort:" do arquivo baixado (com backup); o original fica
+// nos dados do Red Code deste PC e volta quando o limite sobe ou sai. Mudou à mão depois? A mudança vira o novo original.
+const ORDEM_ESFORCO = ['low', 'medium', 'high', 'xhigh', 'max'];
+function aplicaLimiteEsforco() {
+    const dados = leDados();
+    const limites = dados.limiteEsforcoPorAgente || {};
+    const guardados = dados.esforcoOriginalAgentes || {};
+    const novos = {};
+    let nomes = [];
+    try { nomes = fs.readdirSync(PASTA_AGENTES_SUA).filter(n => ARQ_AGENTE.test(n)); } catch (e) { /* sem pasta */ }
+    for (const n of nomes) {
+        const abs = path.join(PASTA_AGENTES_SUA, n), chave = abs.toLowerCase();
+        const limite = ORDEM_ESFORCO.includes(limites[chave]) ? limites[chave] : '';
+        let texto;
+        try { if (fs.statSync(abs).size > LIMITE_AGENTE) continue; texto = fs.readFileSync(abs, 'utf8'); } catch (e) { continue; }
+        const fm = texto.match(/^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(?:\r?\n|$)/);
+        if (!fm) continue;
+        const linha = fm[1].match(/^effort:[ \t]*["']?([A-Za-z]+)["']?[ \t]*$/m);
+        const atual = linha ? linha[1].toLowerCase() : '';
+        const g = guardados[chave];
+        // O que o arquivo "quer": o original guardado (se ainda está com o valor que o limite pôs) ou o que está lá
+        const desejado = g && atual === g.posto ? g.original : atual;
+        if (!desejado || !ORDEM_ESFORCO.includes(desejado)) continue;
+        const alvo = limite && ORDEM_ESFORCO.indexOf(desejado) > ORDEM_ESFORCO.indexOf(limite) ? limite : desejado;
+        if (alvo !== atual && linha) {
+            backupArquivoAgente(abs);
+            const novoFm = fm[1].replace(/^effort:.*$/m, 'effort: ' + alvo);
+            fs.writeFileSync(abs, texto.slice(0, fm.index) + fm[0].replace(fm[1], () => novoFm) + texto.slice(fm.index + fm[0].length));
+        }
+        if (alvo !== desejado) novos[chave] = { original: desejado, posto: alvo };
+    }
+    if (JSON.stringify(novos) !== JSON.stringify(guardados)) { const d = leDados(); d.esforcoOriginalAgentes = novos; gravaDados(d); }
+    return { limites, originais: novos };
+}
+setTimeout(() => { try { aplicaLimiteEsforco(); } catch (e) { console.error('limite de esforço dos agentes:', e.message); } }, 3000);
 function acaoAgente(corpo) {
     const acao = corpo.acao;
+    if (acao === 'limite-esforco') {
+        const limite = String(corpo.limite || '');
+        if (limite && !ORDEM_ESFORCO.includes(limite)) throw erroAgente('Esforço inválido.');
+        const alvo = validaArquivoAgente(corpo.arquivo);
+        if (path.dirname(alvo).toLowerCase() !== PASTA_AGENTES_SUA.toLowerCase()) throw erroAgente('O limite de esforço vale só para os seus agentes.');
+        const d = leDados();
+        d.limiteEsforcoPorAgente = d.limiteEsforcoPorAgente || {};
+        if (limite) d.limiteEsforcoPorAgente[alvo.toLowerCase()] = limite; else delete d.limiteEsforcoPorAgente[alvo.toLowerCase()];
+        delete d.limiteEsforcoAgentes;
+        gravaDados(d);
+        return;
+    }
     if (acao === 'criar') {
         const dir = pastaDoEscopo(corpo.escopo);
         const c = validaCamposAgente(corpo);
@@ -1517,7 +1566,12 @@ function acaoAgente(corpo) {
         }
         backupArquivoAgente(abs);
         fs.writeFileSync(novo, montaAgente(original, c));
-        if (trocouNome) fs.unlinkSync(abs);
+        if (trocouNome) {
+            fs.unlinkSync(abs);
+            const d = leDados(), de = abs.toLowerCase(), para = novo.toLowerCase();
+            for (const k of ['limiteEsforcoPorAgente', 'esforcoOriginalAgentes']) if (d[k] && d[k][de]) { d[k][para] = d[k][de]; delete d[k][de]; }
+            gravaDados(d);
+        }
         return;
     }
     throw erroAgente('Ação inválida.');
@@ -1541,7 +1595,15 @@ function regrasEAgentes(cwd) {
         const pastaRegras = path.join(cwd, '.claude', 'rules');
         try { for (const f of fs.readdirSync(pastaRegras).filter(f => f.endsWith('.md')).sort()) lerInstrucao('Regra: ' + f.replace(/\.md$/, ''), path.join(pastaRegras, f), 'projeto'); } catch (e) { /* sem regras */ }
     }
-    return { grupos: listaAgentes(), instrucoes };
+    let limiteEsforco = { limites: {}, originais: {} };
+    try { limiteEsforco = aplicaLimiteEsforco(); } catch (e) { /* segue sem limite */ }
+    const grupos = listaAgentes();
+    grupos.forEach(g => g.agentes.forEach(a => {
+        const chave = String(a.arquivo).toLowerCase(), o = limiteEsforco.originais[chave];
+        if (o) a.esforcoOriginal = o.original;
+        if (g.escopo === 'seu') a.limiteEsforco = limiteEsforco.limites[chave] || '';
+    }));
+    return { grupos, instrucoes };
 }
 
 // Comandos e skills para o menu "/" da caixa de mensagem (do usuário e do projeto)
@@ -2321,6 +2383,19 @@ const servidor = http.createServer(async (req, res) => {
         }
         if (url.pathname.startsWith('/api/chat/') || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta'].includes(url.pathname)) return await rotaChat(req, res, url);
         if (url.pathname === '/api/sessoes') return responde(res, 200, listaSessoes());
+        // Player do rodapé: o que está tocando no Windows, a capa e os botões (tocar/pausar, próxima)
+        if (url.pathname === '/api/midia/capa' && req.method === 'GET') {
+            const capa = midia.capaAtual();
+            if (url.searchParams.get('t') !== TOKEN || !capa) { res.writeHead(capa ? 403 : 404); return res.end(); }
+            res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+            return res.end(capa);
+        }
+        if (url.pathname === '/api/midia') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            if (req.method === 'GET') return responde(res, 200, midia.le());
+            try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
+            catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
         if (url.pathname === '/api/uso') {
             const agora = Date.now();
             const vencido = !cacheUso.dados || agora - cacheUso.em > 55000 || (url.searchParams.has('atualizar') && agora - cacheUso.em > 10000);
