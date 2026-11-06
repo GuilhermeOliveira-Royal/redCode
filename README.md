@@ -1,35 +1,117 @@
-# Red Code
+<p align="center">
+  <img src="favicon.svg" width="96" alt="Logo do Red Code">
+</p>
 
-App desktop para Windows (Electron) que acompanha e conversa com o **Claude Code**. Reúne numa janela só as suas conversas, um chat com o Claude, terminal, editor, painel Git e um navegador de testes.
+<h1 align="center">Red Code</h1>
 
-Ele usa a conta do Claude Code que já está logada no seu PC. Não pede chave de API.
+<p align="center">
+  App desktop para Windows que acompanha e conversa com o Claude Code, numa janela só, usando a conta do Claude Code que já está logada no seu PC.
+</p>
 
-## O que ele faz
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-0078D4?logo=windows&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/Electron-47848F?logo=electron&logoColor=white" alt="Electron">
+  <img src="https://img.shields.io/badge/Claude%20Code-D97757?logo=claude&logoColor=white" alt="Claude Code">
+  <img src="https://img.shields.io/badge/licen%C3%A7a-ISC-green" alt="Licença ISC">
+</p>
 
-**Conversas**
-- Lista todas as conversas do Claude Code (lidas de `~/.claude/projects`), agrupadas por projeto, com o estado de cada uma: trabalhando, fez uma pergunta, respondeu, agente rodando.
-- Acompanha o que o Claude está fazendo ao vivo, numa linha do tempo com filtros (comandos, edições, leituras, agentes, erros) e um mapa dos agentes em segundo plano.
+<p align="center">
+  <a href="#funcionalidades">Funcionalidades</a> ·
+  <a href="#instalação">Instalação</a> ·
+  <a href="#atalhos">Atalhos</a> ·
+  <a href="#perfis">Perfis</a>
+</p>
+
+<p align="center">
+  <img src="docs/imagens/git-grafo.png" width="100%" alt="Conversa aberta ao lado do painel Git, com alterações agrupadas por pasta e grafo de branches">
+</p>
+
+## Destaques
+
+- Usa a conta do Claude Code que já está logada no PC. Não pede chave de API.
+- Acompanha o Claude ao vivo: linha do tempo, agentes em segundo plano e pedidos de permissão na própria página.
+- O editor mostra o arquivo que o Claude está alterando, no momento em que muda.
+- Painel Git com grafo de branches, commit, fetch, pull, push e worktrees.
+- Perfis com várias contas do Claude e várias identidades do Git. Cada conversa pode usar a sua.
+- Terminal, editor e navegador embutidos, na pasta do projeto.
+
+## Funcionalidades
+
+### Conversas e acompanhamento
+
+- Lista as conversas do Claude Code, agrupadas por projeto, com o estado de cada uma.
+- Linha do tempo ao vivo com filtros (comandos, edições, leituras, agentes, erros) e um mapa dos agentes em segundo plano.
+- Painel lateral com o palco de agentes e o consumo do dia, pelo preço da API: esta conversa, o projeto ou todas.
 - Mostra os limites de uso do plano e o consumo da conversa.
 - Avisa no Windows quando uma conversa termina ou faz uma pergunta.
 
-**Conversar pelo app**
+<img src="docs/imagens/conversa-claro.png" width="100%" alt="Conversa com linha do tempo, atividade dos agentes e painel lateral com o consumo do dia, em tema claro">
+
+### Conversar pelo app
+
 - Dois modos, no alternador do topo da barra lateral:
   - **Código** (`</>`): conversa dentro de uma pasta de projeto, com arquivos, terminal e todas as ferramentas do Claude Code.
   - **Chat** (balão): conversa comum, sem pasta e sem ferramentas. Não lê arquivos, não roda comandos e não acessa a internet.
-- Permissões e perguntas de múltipla escolha do Claude são respondidas na própria página.
-- Modo de permissão, modelo e esforço escolhidos por conversa; anexos de imagens e arquivos; `/` para comandos e skills; `@` para citar arquivos do projeto.
-- Voltar os arquivos ao estado de uma mensagem anterior (checkpoint).
-- Continuar uma conversa grande numa conversa nova, com um resumo, mantendo as duas ligadas.
+- Permissões e perguntas de múltipla escolha são respondidas na própria página.
+- Modo de permissão, modelo e esforço escolhidos por conversa. Anexos de imagens e arquivos. `/` para comandos e skills, `@` para citar arquivos do projeto.
+- Checkpoint: volta os arquivos ao estado de uma mensagem anterior.
+- Continua uma conversa grande numa conversa nova, com um resumo, mantendo as duas ligadas.
 - Painel **Tarefas em segundo plano** acima do campo de mensagem, com botão para parar cada tarefa.
+- Menu **⋯** da conversa com ações seguras. Arquivar fica longe de um clique acidental. **Dados da conversa** mostra os dados e permite começar uma conversa nova a partir deles.
+- Desativar um agente do projeto vale só para você.
 
-**Ferramentas junto da conversa**
-- Terminal PowerShell embutido, na pasta do projeto.
-- Editor de arquivos (Monaco) que preserva codificação, BOM e fim de linha.
-- Painel Git: estado, diff, grafo, branches, stash, commit, fetch/pull/push e worktrees.
-- Conversas em paralelo no mesmo projeto, cada uma numa cópia isolada (worktree, branch `painel/...`).
-- Navegador embutido que o Claude controla (abrir páginas, ler, clicar, digitar, tirar print).
-- Ponte com o VS Code aberto: o Claude enxerga erros do editor, a seleção e as abas.
+<img src="docs/imagens/nova-conversa.png" width="100%" alt="Janela de nova conversa com projeto, cópia isolada, modelo, esforço, conta do Claude e identidade do Git">
+
+Na janela de **Nova conversa** você escolhe o projeto, a cópia isolada (worktree), o modelo, o esforço, a conta do Claude e a identidade do Git da conversa. **Enfileirar** guarda o pedido para depois.
+
+### Editor ao vivo
+
+- Mostra o arquivo real que o Claude está alterando, no momento em que muda, com animação de escrita.
+- Também acompanha o que comandos PowerShell e Bash gravam.
+- Aparece só quando o Claude mexe em código. Tem abas por arquivo.
+- Botão **Formatar**: mostra o arquivo formatado como o Alt + Shift + F do VS Code deixaria (só visualização, o arquivo não muda). **Abrir no VS Code** leva o arquivo para o editor.
+
+<img src="docs/imagens/editor-vivo.png" width="100%" alt="Editor ao vivo ao lado da conversa, mostrando o arquivo que o Claude está alterando">
+
+### Editor de arquivos e Markdown
+
+- Editor Monaco que preserva a codificação, o BOM e o fim de linha do arquivo.
+- Visualização de Markdown igual à do VS Code: ao lado do código com `Ctrl` + `K`, depois `V`, ou sozinha com `Ctrl` + `Shift` + `V`.
+- A visualização atualiza enquanto você digita.
+
+<img src="docs/imagens/markdown.png" width="100%" alt="Editor Monaco com a visualização de Markdown ao lado do código">
+
+### Terminal
+
+- Terminal PowerShell embutido, aberto na pasta do projeto.
+- Botão **Mandar saída ao Claude** para levar a saída do terminal à conversa.
+
+<img src="docs/imagens/terminal.png" width="100%" alt="Terminal PowerShell embutido na pasta do projeto">
+
+### Painel Git
+
+- Estado, diff, grafo, branches, stash, commit, fetch, pull, push e worktrees.
+- Alterações agrupadas por pasta. O grafo mostra as branches com o avatar ou as iniciais de cada autor.
+- Segue o repositório que a conversa está editando.
+- Usa a identidade Git da conversa, quando ela tem uma. Veja [Perfis](#perfis).
+
+<img src="docs/imagens/git-grafo.png" width="100%" alt="Painel Git com alterações agrupadas por pasta e grafo de branches com avatares">
+
+### Perfis
+
+- Cada perfil junta uma conta do Claude e uma identidade do Git. O seletor no rodapé da lista de conversas troca o Red Code inteiro.
+- Cada conversa pode ter a sua própria conta do Claude e a sua própria identidade do Git.
+- Painel Git, terminal, commits e push feitos pelo Claude numa conversa usam a identidade dela. As outras conversas seguem o perfil.
+- A lista mostra um selo quando a conversa usa conta ou identidade diferente do perfil.
+
+<img src="docs/imagens/config-perfis.png" width="100%" alt="Configurações de perfis, em que cada perfil junta uma conta do Claude e uma identidade do Git">
+
+### Outras ferramentas
+
+- Ponte com o VS Code aberto: o Claude enxerga os erros do editor, a seleção e as abas.
+- Navegador embutido que o Claude controla: abrir páginas, ler, clicar, digitar e tirar print.
 - Integrações: GitHub pelo `gh` (só leitura: PRs e CI), lista dos hooks configurados e card do Trello ligado a cada conversa.
+- Conversas em paralelo no mesmo projeto, cada uma numa cópia isolada (worktree, branch `painel/...`).
 - Tarefas agendadas e fila de pedidos. Nada é aprovado sozinho: pedidos de permissão sempre esperam você.
 - Busca em todas as conversas, resumo do dia, linha do tempo de um arquivo e modelos de pedido.
 
@@ -65,7 +147,7 @@ npm install
 npm start
 ```
 
-Abre o servidor local e a página fica em `http://127.0.0.1:4317`. Esse modo não tem bandeja, atalho global, seletor de pastas do Windows nem navegador embutido.
+Abre o servidor local, e a página fica em `http://127.0.0.1:4317`. Esse modo não tem bandeja, atalho global, seletor de pastas do Windows nem navegador embutido.
 
 Não abra o `index.html` direto da pasta: a página precisa do servidor e fica em branco sem ele.
 
@@ -107,12 +189,14 @@ O botão **ⓘ** (canto superior direito) mostra os detalhes da conversa: modelo
 | `Esc` | Interromper a resposta em andamento |
 | `/` ou `@` na caixa | Comandos e skills / citar arquivo do projeto |
 | `F5` ou `Ctrl` + `R` | Recarregar a página |
+| `Ctrl` + `K`, depois `V` | Mostrar a visualização de Markdown ao lado do código (editor) |
+| `Ctrl` + `Shift` + `V` | Abrir a visualização de Markdown sozinha (editor) |
 
 Fechar a janela só a esconde na bandeja do sistema. Para encerrar o app de verdade, use **Sair** no ícone da bandeja.
 
-## Perfis (conta do Claude + identidade do Git)
+## Perfis
 
-Funcionam como os perfis do navegador. O seletor ao lado do logo troca o Red Code inteiro de perfil. Monte os perfis em **Configurações › Perfis**.
+Funcionam como os perfis do navegador. O seletor de perfil, no rodapé da lista de conversas, troca o Red Code inteiro. Monte os perfis em **Configurações › Perfis**.
 
 - **Conta do Claude:** cada conta tem a própria pasta, com login, configurações e conversas. Ela é usada pelo Claude Code por meio de `CLAUDE_CONFIG_DIR`.
   - Ao criar, dá para copiar suas configurações da conta padrão: CLAUDE.md, hooks, agentes, skills, plugins e MCP.
@@ -122,16 +206,16 @@ Funcionam como os perfis do navegador. O seletor ao lado do logo troca o Red Cod
   - O login do GitHub é feito pelo Git Credential Manager, guardado num espaço só da identidade (`credential.namespace`). O login de sempre não muda.
   - Antes do primeiro login, **Verificar segurança** confirma isso: grava e apaga uma credencial falsa num endereço inventado.
 - **Perfil:** junta uma conta e uma identidade, por exemplo "Pessoal" ou "Claude pessoal + Git da empresa".
-  - O perfil **Padrão** é o Red Code de sempre, sem nenhuma variável.
+  - O perfil **Padrão** é o Red Code de sempre, sem nenhuma variável. "Conta padrão" e "Git padrão" são os da máquina.
   - A lista de conversas mostra só as da conta do perfil em uso.
   - Agendamentos e fila só rodam no perfil em que foram criados.
 - **Trocar de perfil** reinicia o servidor do Red Code assim que nenhuma conversa ou terminal estiver rodando. Dá para cancelar ou usar **Trocar agora**, que para tudo antes.
-- **Dados dos perfis** ficam em `%APPDATA%\Red Code\perfis`; a variável `PAINEL_PERFIS` troca esse caminho. Nenhum token fica nesse arquivo.
+- **Dados dos perfis** ficam em `%APPDATA%\Red Code\perfis`. A variável `PAINEL_PERFIS` troca esse caminho. Nenhum token fica nesse arquivo.
 - **Dentro de um perfil**, o `git config --global` grava num arquivo do Red Code que é refeito a cada subida.
 
 ## Onde ficam os dados
 
-- **App desktop:** favoritos, vínculos entre conversas, anexos e logs em `%APPDATA%\Red Code`. Trocar a pasta do app por uma versão nova não apaga esses dados.
+- **App desktop:** favoritos, vínculos entre conversas, anexos e logs ficam em `%APPDATA%\Red Code`. Trocar a pasta do app por uma versão nova não apaga esses dados.
 - **Só servidor (`npm start`):** o `dados.json` e a pasta de anexos ficam ao lado do `server.js`.
 - **Conversas:** lidas de `~/.claude/projects`. O app não copia nem envia esse conteúdo.
 - **Conversas do modo Chat:** gravadas pelo Claude Code em `~/.claude/projects`, na pasta que corresponde a `%APPDATA%\Red Code\chat`.
