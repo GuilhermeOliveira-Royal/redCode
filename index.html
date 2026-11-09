@@ -1065,6 +1065,37 @@ a.mini { text-decoration: none; display: inline-flex; align-items: center; }
 /* Mapa de agentes */
 .caixa.mapa { width: min(1180px, 96vw); height: min(820px, 92vh); display: flex; flex-direction: column; padding: 18px 20px; }
 .cabeca-mapa { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+/* Janela do /mcp */
+.caixa.janela-mcp { width: min(560px, 94vw); max-height: 86vh; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
+.filtro-mcp { width: 100%; box-sizing: border-box; height: 34px; padding: 0 11px; border: 1px solid var(--linha); border-radius: 8px; background: var(--folha); color: var(--tinta); font: 13px var(--sans); }
+.filtro-mcp:focus-visible { outline: none; border-color: var(--voce); box-shadow: 0 0 0 2px color-mix(in srgb, var(--voce) 22%, transparent); }
+.lista-mcp { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.grupo-mcp { margin: 8px 0 2px; font: 600 12px var(--sans); color: var(--grafite); }
+.grupo-mcp:first-child { margin-top: 0; }
+.grupo-mcp small { font-weight: 400; }
+.item-mcp { border: 1px solid var(--linha); border-radius: 9px; background: var(--folha); overflow: hidden; }
+.item-mcp.aberto { border-color: color-mix(in srgb, var(--tinta) 22%, var(--linha)); }
+.cab-mcp { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 11px; text-align: left; color: var(--tinta); }
+.cab-mcp:hover { background: var(--realce); }
+.nome-mcp { flex: 1; min-width: 0; font: 13px var(--mono, monospace); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qtd-mcp { color: var(--grafite); font-size: 11.5px; white-space: nowrap; }
+.estado-mcp2 { flex: none; font: 600 11.5px var(--sans); padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+.estado-mcp2.ok { background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent); }
+.estado-mcp2.erro { background: color-mix(in srgb, var(--erro) 14%, transparent); color: var(--erro); border: 1px solid color-mix(in srgb, var(--erro) 45%, transparent); }
+.estado-mcp2.atencao { background: color-mix(in srgb, var(--atencao) 16%, transparent); color: var(--atencao); border: 1px solid color-mix(in srgb, var(--atencao) 45%, transparent); }
+.estado-mcp2.espera, .estado-mcp2.off { color: var(--grafite); border: 1px solid var(--linha); }
+.detalhe-mcp { padding: 2px 11px 11px; display: flex; flex-direction: column; gap: 7px; border-top: 1px solid var(--linha); padding-top: 9px; }
+.detalhe-mcp > small { color: var(--grafite); }
+.onde-mcp { font-size: 11.5px; color: var(--grafite); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.erro-mcp { margin: 0; color: var(--erro); font-size: 12.5px; }
+.acoes-mcp { display: flex; gap: 6px; flex-wrap: wrap; }
+.acoes-mcp:empty { display: none; }
+.detalhe-mcp .config-ferramentas { margin: 0; }
+.rodape-mcp .mini { white-space: nowrap; flex: none; }
+.rodape-mcp { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--grafite); font-size: 12px; }
+/* Escolha do shell no cabeçalho do terminal */
+.shell-terminal { height: 26px; padding: 0 24px 0 8px; font: 12px var(--sans); color: var(--tinta); border: 1px solid var(--linha); border-radius: 7px; background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5l3 3 3-3' fill='none' stroke='%238a8a8a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 8px center / 10px; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.shell-terminal option { background: var(--folha); color: var(--tinta); }
 .cabeca-mapa h2 { margin: 0; }
 .cabeca-mapa .nota { margin-top: 2px; }
 .fechar-mapa { font-size: 24px; line-height: 1; color: var(--grafite); }
@@ -1853,6 +1884,11 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                 <span class="espaco"></span>
                 <button type="button" class="mini" id="btnMandarSaida" title="Coloca as últimas linhas do terminal no campo de mensagem">Mandar saída ao Claude</button>
                 <button type="button" class="mini" id="btnLimparTerminal">Limpar</button>
+                <select id="shellTerminal" class="shell-terminal" title="Qual terminal abrir (vale para os próximos; troca o desta pasta agora)" aria-label="Qual terminal">
+                    <option value="powershell">PowerShell</option>
+                    <option value="gitbash">Git Bash</option>
+                    <option value="cmd">CMD</option>
+                </select>
                 <button type="button" class="mini" id="btnNovoTerminal" title="Fecha este e abre outro na mesma pasta">Novo</button>
                 <button type="button" class="mini" id="btnFecharTerminal" title="Esconder (Ctrl + `)">Esconder</button>
             </div>
@@ -1915,6 +1951,14 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 <div class="alca-coluna" data-alca="lateral" title="Arraste para mudar a largura do painel (duplo clique volta ao padrão)" hidden></div>
 <div class="alca-coluna" data-alca="conversa" title="Arraste para mudar a largura da conversa (duplo clique volta ao padrão)" hidden></div>
 <div class="recado" id="recado" role="status" aria-live="polite"></div>
+<div class="ajuda" id="janelaMcp" hidden>
+    <div class="caixa janela-mcp" role="dialog" aria-modal="true" aria-labelledby="tituloMcp">
+        <div class="cabeca-mapa"><h2 id="tituloMcp">Servidores MCP</h2><button class="fechar-mapa" data-fechar-mcp aria-label="Fechar">×</button></div>
+        <input id="filtroMcp" class="filtro-mcp" placeholder="Filtrar servidores…" autocomplete="off" spellcheck="false" aria-label="Filtrar servidores">
+        <div id="listaMcp" class="lista-mcp"></div>
+        <div class="rodape-mcp"><small id="notaMcp"></small><button type="button" class="mini" data-mcp-atualizar>↻ Atualizar</button></div>
+    </div>
+</div>
 <div class="ajuda" id="janelaBusca" hidden>
     <div class="caixa reescritos" role="dialog" aria-modal="true" aria-labelledby="tituloBusca">
         <div class="cabeca-mapa"><h2 id="tituloBusca">Buscar em todas as conversas</h2><button class="fechar-mapa" data-fechar-busca aria-label="Fechar">×</button></div>
@@ -3252,7 +3296,13 @@ function verificaAcompanhar(d) {
         acompanhaArquivo(d.cwd, m[1]);
     }
 }
-function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = 'PowerShell', titulo = '', login = '' } = {}) {
+// Shell do terminal (Configuração deste navegador): PowerShell, Git Bash ou CMD
+const NOMES_SHELL = { powershell: 'PowerShell', gitbash: 'Git Bash', cmd: 'CMD' };
+const shellPreferido = () => { try { const v = localStorage.getItem('painelShellTerminal'); return NOMES_SHELL[v] ? v : 'powershell'; } catch (e) { return 'powershell'; } };
+function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo = '', login = '', claude = '' } = {}) {
+    // Comando do próprio Red Code (acompanhar arquivo), login e /mcp do Claude: sempre PowerShell
+    const shell = comando || login || claude ? 'powershell' : shellPreferido();
+    rotulo = rotulo || NOMES_SHELL[shell];
     const el = document.createElement('div');
     document.getElementById('corpoTerminal').appendChild(el);
     const term = new Terminal({
@@ -3263,7 +3313,7 @@ function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = 'PowerShell
     term.loadAddon(fit);
     term.open(el);
     try { fit.fit(); } catch (e) { /* sem tamanho ainda */ }
-    const ws = new WebSocket(`ws://${location.host}/ws/terminal?token=${TOKEN_PAINEL}&cwd=${encodeURIComponent(pasta)}&cols=${term.cols}&rows=${term.rows}${login ? '&login=' + encodeURIComponent(login) : (sessaoAtual && !sessaoEhChat() ? '&conversa=' + encodeURIComponent(sessaoAtual) : '')}`);
+    const ws = new WebSocket(`ws://${location.host}/ws/terminal?token=${TOKEN_PAINEL}&cwd=${encodeURIComponent(pasta)}&cols=${term.cols}&rows=${term.rows}&shell=${shell}${claude ? '&claude=' + encodeURIComponent(claude) : ''}${login ? '&login=' + encodeURIComponent(login) : (sessaoAtual && !sessaoEhChat() ? '&conversa=' + encodeURIComponent(sessaoAtual) : '')}`);
     ws.onmessage = (ev) => term.write(typeof ev.data === 'string' ? ev.data : '');
     // Comando inicial (ex.: acompanhar um arquivo): enviado assim que o PowerShell abrir
     if (comando) ws.addEventListener('open', () => setTimeout(() => { if (ws.readyState === 1) ws.send(JSON.stringify({ tipo: 'entrada', dados: comando })); }, 900), { once: true });
@@ -3275,6 +3325,16 @@ function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = 'PowerShell
     terminais.set(chave, t);
     return t;
 }
+// Trocar o shell: guarda a escolha e reabre o terminal principal desta pasta com ele
+document.getElementById('shellTerminal').value = shellPreferido();
+document.getElementById('shellTerminal').addEventListener('change', (ev) => {
+    try { localStorage.setItem('painelShellTerminal', ev.target.value); } catch (e) { /* sem armazenamento */ }
+    const atual = terminais.get(pastaTerminalAtual), pasta = atual ? atual.pasta : pastaDaConversa();
+    if (!pasta) return;
+    fechaTerminal(pasta);
+    mostraTerminal(pasta);
+    recado('Terminal: ' + NOMES_SHELL[ev.target.value]);
+});
 function escondeTerminal() {
     document.getElementById('painelTerminal').hidden = true;
     document.getElementById('btnTerminal').setAttribute('aria-pressed', 'false');
@@ -5900,6 +5960,95 @@ janelaConfig.addEventListener('click', async (ev) => {
     }
 });
 let agendamentosTela = [];
+
+/* ---------- /mcp: servidores MCP da conversa (estado, ferramentas, reconectar, ligar/desligar, entrar) ---------- */
+const janelaMcp = document.getElementById('janelaMcp');
+const GRUPOS_MCP = { user: 'Seus (todos os projetos)', project: 'Do projeto', local: 'Locais (só você, neste projeto)', claudeai: 'claude.ai', dynamic: 'Dinâmicos', plugin: 'Plugins', sdk: 'Red Code', agent: 'De agentes', managed: 'Gerenciados', enterprise: 'Gerenciados' };
+const ESTADO_MCP = { connected: ['ok', '✓ Conectado'], failed: ['erro', 'Falhou'], 'needs-auth': ['atencao', 'Precisa entrar'], pending: ['espera', 'Conectando…'], disabled: ['off', 'Desligado'] };
+let mcpLista = [];
+const mcpAbertos = new Set();
+async function abreMcp() {
+    if (!sessaoAtual || sessaoEhChat()) return recado('Abra uma conversa de código para ver os servidores MCP dela.');
+    janelaMcp.hidden = false;
+    document.getElementById('filtroMcp').value = '';
+    document.getElementById('listaMcp').innerHTML = '<p class="nota">Carregando…</p>';
+    document.getElementById('filtroMcp').focus();
+    await carregaMcp();
+}
+async function carregaMcp() {
+    const [projeto, sessao] = sessaoAtual.split('/');
+    try {
+        const r = await fetch(`/api/mcp?projeto=${encodeURIComponent(projeto)}&sessao=${encodeURIComponent(sessao)}`, { headers: { 'X-Painel': '1' } });
+        const lista = await r.json();
+        if (!r.ok) throw new Error(lista.erro || 'erro');
+        mcpLista = Array.isArray(lista) ? lista : [];
+    } catch (e) {
+        document.getElementById('listaMcp').innerHTML = `<p class="nota">Não deu para ler os servidores MCP: ${esc(e.message)}</p>`;
+        return;
+    }
+    desenhaMcp();
+}
+function desenhaMcp() {
+    const viva = !!(conversaRelevante() && conversaRelevante().vivo);
+    const filtro = semAcento(document.getElementById('filtroMcp').value.trim().toLowerCase());
+    const lista = mcpLista.filter(m => !filtro || semAcento(String(m.name).toLowerCase()).includes(filtro));
+    // Grupos na ordem de GRUPOS_MCP; origem desconhecida vai no fim com o próprio nome
+    const ordem = Object.keys(GRUPOS_MCP);
+    const grupos = new Map();
+    for (const m of lista) { const g = m.scope || m.source || 'outros'; if (!grupos.has(g)) grupos.set(g, []); grupos.get(g).push(m); }
+    const chaves = [...grupos.keys()].sort((a, b) => ((ordem.indexOf(a) + 1) || 99) - ((ordem.indexOf(b) + 1) || 99));
+    const item = (m) => {
+        const [classe, rotulo] = ESTADO_MCP[m.status] || ['off', m.status];
+        const aberto = mcpAbertos.has(m.name);
+        const cfg = m.config || {};
+        const onde = cfg.url || [cfg.command, ...(Array.isArray(cfg.args) ? cfg.args : [])].filter(Boolean).join(' ');
+        const ferramentas = Array.isArray(m.tools) ? m.tools : [];
+        const detalhes = `<div class="detalhe-mcp">
+                ${m.serverInfo ? `<small>${esc(m.serverInfo.name)} ${esc(m.serverInfo.version || '')}</small>` : ''}
+                ${onde ? `<code class="onde-mcp" title="${esc(onde)}">${esc(onde)}</code>` : ''}
+                ${m.error ? `<p class="erro-mcp">${esc(m.error)}</p>` : ''}
+                ${ferramentas.length ? `<div class="config-ferramentas">${ferramentas.slice(0, 40).map(f => `<span title="${esc(f.description || '')}">${esc(f.name)}</span>`).join('')}${ferramentas.length > 40 ? `<span>+${ferramentas.length - 40}</span>` : ''}</div>` : ''}
+                <div class="acoes-mcp">
+                    ${m.status === 'needs-auth' ? `<button class="mini principal" data-mcp-entrar="${esc(m.name)}" title="Abre o /mcp do Claude no terminal para entrar na conta deste servidor">Entrar…</button>` : ''}
+                    ${viva && m.status !== 'disabled' ? `<button class="mini" data-mcp-acao="reconectar" data-servidor="${esc(m.name)}">Reconectar</button>` : ''}
+                    ${viva ? `<button class="mini" data-mcp-acao="${m.status === 'disabled' ? 'ligar' : 'desligar'}" data-servidor="${esc(m.name)}">${m.status === 'disabled' ? 'Ligar' : 'Desligar'}</button>` : ''}
+                </div>
+            </div>`;
+        return `<div class="item-mcp ${aberto ? 'aberto' : ''}">
+                <button type="button" class="cab-mcp" data-mcp-abre="${esc(m.name)}" aria-expanded="${aberto}"><span class="nome-mcp">${esc(m.name)}</span>
+                    ${ferramentas.length ? `<small class="qtd-mcp">${plural(ferramentas.length, 'ferramenta', 'ferramentas')}</small>` : ''}<span class="estado-mcp2 ${classe}">${esc(rotulo)}</span></button>
+                ${aberto ? detalhes : ''}
+            </div>`;
+    };
+    document.getElementById('listaMcp').innerHTML = !mcpLista.length ? '<p class="nota">Nenhum servidor MCP nesta conversa.</p>'
+        : !lista.length ? '<p class="nota">Nenhum servidor com esse nome.</p>'
+        : chaves.map(g => `<h4 class="grupo-mcp">${esc(GRUPOS_MCP[g] || g)} <small>(${grupos.get(g).length})</small></h4>${grupos.get(g).map(item).join('')}`).join('');
+    document.getElementById('notaMcp').textContent = viva ? 'Clique num servidor para ver as ferramentas e as ações.' : 'Reconectar, ligar e desligar funcionam com a conversa aberta aqui (mande uma mensagem por aqui primeiro).';
+}
+document.getElementById('filtroMcp').addEventListener('input', desenhaMcp);
+janelaMcp.addEventListener('click', async (ev) => {
+    if (ev.target === janelaMcp || ev.target.closest('[data-fechar-mcp]')) { janelaMcp.hidden = true; return; }
+    if (ev.target.closest('[data-mcp-atualizar]')) return carregaMcp();
+    const abre = ev.target.closest('[data-mcp-abre]');
+    if (abre) { const n = abre.dataset.mcpAbre; if (mcpAbertos.has(n)) mcpAbertos.delete(n); else mcpAbertos.add(n); return desenhaMcp(); }
+    const entrar = ev.target.closest('[data-mcp-entrar]');
+    if (entrar) {
+        janelaMcp.hidden = true;
+        const pasta = pastaDaConversa();
+        fechaTerminal(pasta + '|mcp');
+        return mostraTerminal(pasta, pasta + '|mcp', { rotulo: 'Claude /mcp', titulo: 'Entrar no servidor MCP ' + entrar.dataset.mcpEntrar, claude: 'mcp' });
+    }
+    const b = ev.target.closest('[data-mcp-acao]');
+    if (b) {
+        b.disabled = true;
+        try {
+            const r = await api('/api/mcp/acao', { sessao: sessaoAtual.split('/')[1], servidor: b.dataset.servidor, acao: b.dataset.mcpAcao });
+            if (Array.isArray(r)) mcpLista = r;
+            recado(b.dataset.mcpAcao === 'reconectar' ? 'Reconectado' : b.dataset.mcpAcao === 'ligar' ? 'Servidor ligado' : 'Servidor desligado');
+        } catch (e) { recado(e.message); }
+        desenhaMcp();
+    }
+});
 janelaConfig.addEventListener('change', async (ev) => {
     const ativo = ev.target.closest('[data-ag-ativo]');
     if (ativo) { try { await api('/api/agendamentos', { lista: agendamentosTela.map(a => a.id === ativo.dataset.agAtivo ? { ...a, ativo: ativo.checked } : a) }); recado(ativo.checked ? 'Tarefa ligada' : 'Tarefa desligada'); } catch (e) { recado(e.message); } return abreConfig('agendadas'); }
@@ -6283,6 +6432,7 @@ document.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') {
         if (!lupa.hidden) { lupa.hidden = true; return; }
         if (!janelaMapa.hidden) { janelaMapa.hidden = true; return; }
+        if (!janelaMcp.hidden) { janelaMcp.hidden = true; return; }
         if (!janelaReescritos.hidden) { janelaReescritos.hidden = true; return; }
         if (!ajuda.hidden) { ajuda.hidden = true; return; }
         if (!janelaNova.hidden) { janelaNova.hidden = true; return; }
@@ -6596,6 +6746,8 @@ async function enviaMensagem() {
     const campo = document.getElementById('mensagem');
     const texto = campo.value.trim() || (anexosPendentes.length ? 'Veja o que anexei.' : '');
     if (!texto || !ultimosDados || !sessaoAtual) return;
+    // /mcp não vai para o Claude: abre a janela dos servidores MCP (como no VS Code)
+    if (/^\/mcp\s*$/i.test(texto)) { campo.value = ''; ajustaAlturaCaixa(); return abreMcp(); }
     if (iniciando) return recado('Espere a conversa nova abrir: esta mensagem iria para a conversa anterior.');
     const [projeto, sessao] = sessaoAtual.split('/');
     const conversa = conversaRelevante();

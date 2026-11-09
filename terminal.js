@@ -1,4 +1,4 @@
-// Terminal de verdade (PowerShell) para a página, por WebSocket.
+// Terminal de verdade (PowerShell, Git Bash ou CMD) para a página, por WebSocket.
 // É o que o navegador sozinho não faz: um console na pasta do projeto, com php, git, npm...
 // Segurança: só aceita conexão da própria página (Host e Origin locais + token secreto que
 // vai no HTML; outro site não consegue ler o HTML por causa do CORS) e só em pastas conhecidas.
@@ -44,20 +44,51 @@ function liga(servidorHttp, { porta, token, pastaPermitida, envDaConversa }) {
             if (!/^[^\\/]+\/[0-9a-f-]{36}$/i.test(pedidoConversa) || !envDaConversa) return recusa('conversa');
             try { envConversa = envDaConversa(pedidoConversa); } catch (e) { return recusa('conversa: ' + e.message); }
         }
-        wss.handleUpgrade(req, socket, cabeca, (ws) => conecta(ws, cwd, url, login, envConversa));
+        // /mcp do Claude (autenticar um servidor MCP): o Claude do SDK com a conta da conversa
+        const comandoClaude = url.searchParams.get('claude') === 'mcp' && !login ? '/mcp' : '';
+        if (comandoClaude && !require('fs').existsSync(CLAUDE_EXE)) return recusa('claude.exe do SDK não encontrado em ' + CLAUDE_EXE);
+        wss.handleUpgrade(req, socket, cabeca, (ws) => conecta(ws, cwd, url, login, envConversa, comandoClaude));
     });
 }
 
 // Executável do Claude que vem com o SDK (o mesmo que as conversas usam)
 const CLAUDE_EXE = require('path').join(__dirname, 'node_modules', '@anthropic-ai', 'claude-agent-sdk-win32-' + (process.arch === 'arm64' ? 'arm64' : 'x64'), 'claude.exe');
-function conecta(ws, cwd, url, login, envConversa) {
+// Git Bash: o bash.exe da instalação do Git (pasta padrão, a do usuário ou a do git que está no PATH)
+let bashAchado;
+function caminhoGitBash() {
+    if (bashAchado !== undefined) return bashAchado;
+    const path = require('path'), fsx = require('fs');
+    const candidatos = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')]
+        .filter(Boolean).map(p => path.join(p, 'Git', 'bin', 'bash.exe'));
+    try {
+        const git = require('child_process').execFileSync('where.exe', ['git'], { encoding: 'utf8', windowsHide: true, timeout: 3000 }).split(/\r?\n/)[0].trim();
+        if (git) candidatos.push(path.join(path.dirname(path.dirname(git)), 'bin', 'bash.exe'));
+    } catch (e) { /* git fora do PATH */ }
+    bashAchado = candidatos.find(c => { try { return fsx.statSync(c).isFile(); } catch (e) { return false; } }) || null;
+    return bashAchado;
+}
+// Shell pedido pela página: executável, argumentos e o que muda no env
+function shellPedido(nome) {
+    if (nome === 'cmd') return { exe: process.env.ComSpec || 'cmd.exe', args: [], nome: 'CMD' };
+    if (nome === 'gitbash') {
+        const bash = caminhoGitBash();
+        if (!bash) return { erro: 'Git Bash não encontrado. Instale o Git for Windows (git-scm.com) ou escolha outro terminal.' };
+        // --login carrega o .bashrc; CHERE_INVOKING mantém a pasta do projeto em vez de ir para a home
+        return { exe: bash, args: ['--login', '-i'], env: { CHERE_INVOKING: '1', MSYSTEM: 'MINGW64' }, nome: 'Git Bash' };
+    }
+    return { exe: 'powershell.exe', args: ['-NoLogo'], nome: 'PowerShell' };
+}
+function conecta(ws, cwd, url, login, envConversa, comandoClaude) {
     const cols = Math.max(20, Math.min(400, Number(url.searchParams.get('cols')) || 100));
     const rows = Math.max(5, Math.min(200, Number(url.searchParams.get('rows')) || 24));
     let p;
     try {
-        // Login: abre o Claude da conta pedindo /login; ao sair dele, o PowerShell fica (dá para fechar a aba)
-        const args = login ? ['-NoLogo', '-NoExit', '-Command', `& '${CLAUDE_EXE.replace(/'/g, "''")}' /login`] : ['-NoLogo'];
-        p = pty.spawn('powershell.exe', args, { name: 'xterm-256color', cwd, cols, rows, env: login ? (() => { const e = { ...process.env, ...login }; for (const k of (login.__sem || [])) delete e[k]; delete e.__sem; return e; })() : (envConversa || process.env), useConpty: true });
+        // Login (/login) e /mcp: abrem o Claude e, ao sair dele, o PowerShell fica (dá para fechar a aba). Sempre PowerShell.
+        const doClaude = login ? '/login' : comandoClaude;
+        const shell = doClaude ? { exe: 'powershell.exe', args: ['-NoLogo', '-NoExit', '-Command', `& '${CLAUDE_EXE.replace(/'/g, "''")}' ${doClaude}`] } : shellPedido(url.searchParams.get('shell'));
+        if (shell.erro) { ws.send(`\r\n\x1b[31m${shell.erro}\x1b[0m\r\n`); return ws.close(); }
+        const base = login ? (() => { const e = { ...process.env, ...login }; for (const k of (login.__sem || [])) delete e[k]; delete e.__sem; return e; })() : (envConversa || process.env);
+        p = pty.spawn(shell.exe, shell.args, { name: 'xterm-256color', cwd, cols, rows, env: shell.env ? { ...base, ...shell.env } : base, useConpty: true });
     } catch (e) {
         ws.send(`\r\nNão consegui abrir o terminal: ${e.message}\r\n`);
         return ws.close();
@@ -81,4 +112,4 @@ function conecta(ws, cwd, url, login, envConversa) {
 // Pastas onde há terminal aberto (um terminal segura a pasta: não dá para remover um worktree com ele)
 const pastasAbertas = () => [...abertos].map(p => p.__cwd).filter(Boolean);
 
-module.exports = { liga, quantos: () => abertos.size, pastasAbertas };
+module.exports = { liga, quantos: () => abertos.size, pastasAbertas, temGitBash: () => !!caminhoGitBash() };

@@ -1612,6 +1612,7 @@ function listaComandos(cwd) {
         { nome: 'compact', descricao: 'Resume a conversa para liberar contexto', origem: 'Claude Code' },
         { nome: 'context', descricao: 'Mostra o que está ocupando o contexto', origem: 'Claude Code' },
         { nome: 'cost', descricao: 'Mostra o custo da conversa', origem: 'Claude Code' },
+        { nome: 'mcp', descricao: 'Servidores MCP desta conversa: estado, reconectar, ligar e desligar', origem: 'Red Code' },
     ];
     const descricaoDe = (arquivo) => {
         try {
