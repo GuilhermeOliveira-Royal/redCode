@@ -133,6 +133,13 @@ Na janela de **Nova conversa** você escolhe o projeto, a cópia isolada (worktr
 
 Os dados e logs ficam em `%APPDATA%\Red Code`, então dá para trocar a pasta por uma versão nova sem perder nada.
 
+### Atualização automática
+
+- **Pelo exe:** ao abrir, o Red Code confere a última release no GitHub. Se houver versão nova, ele pergunta, baixa e troca a pasta do programa quando você reinicia ou sai. Os dados em `%APPDATA%\Red Code` não mudam.
+- **Pelo código:** ao abrir, ele faz `git pull` (só avançando, e só se a pasta não tiver alteração sua não commitada). Se o `package.json` mudou, roda `npm install`; se o app desktop mudou, reabre sozinho.
+
+O que aconteceu em cada abertura fica no `servidor.log`.
+
 ### Rodar pelo código
 
 ```bash

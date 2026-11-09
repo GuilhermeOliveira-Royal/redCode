@@ -123,6 +123,13 @@ function nomeProjeto(pasta) {
 }
 
 function limpaTextoUsuario(texto) {
+    // Comando "/" (skill, /login...): fica só como você digitou, "/nome argumentos" (sem o nome repetido)
+    const comando = String(texto || '').match(/<command-name>([\s\S]*?)<\/command-name>/);
+    if (comando) {
+        const args = (String(texto).match(/<command-args>([\s\S]*?)<\/command-args>/) || [])[1] || '';
+        const nome = comando[1].trim();
+        return ((nome.startsWith('/') ? nome : '/' + nome) + ' ' + args.trim()).trim();
+    }
     return String(texto || '')
         .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '')
         .replace(/<\/?(command-name|command-message|command-args|local-command-stdout)>/g, '')

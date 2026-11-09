@@ -15,6 +15,7 @@ if (EMPACOTADO && !app.commandLine.hasSwitch('user-data-dir')) app.setPath('user
 const PASTA_DADOS = EMPACOTADO ? app.getPath('userData') : __dirname;
 if (EMPACOTADO) { fs.mkdirSync(PASTA_DADOS, { recursive: true }); process.env.PAINEL_DADOS = PASTA_DADOS; }
 const navegador = require('./navegador');
+const atualizacao = require('./atualizacao');
 let controleNavegador = null;   // { porta, token } do navegador embutido (passado ao servidor por env)
 
 const PORTA = Number(process.env.PAINEL_PORTA || 4317);
@@ -572,15 +573,67 @@ app.whenReady().then(async () => {
     const existente = await pede('/api/versao', 1500);
     if (existente && existente.ok) viraAnexado();
     else {
+        // Rodando pelo código: puxa o que há de novo no GitHub antes de subir o servidor
+        if (!EMPACOTADO) {
+            const r = await atualizacao.pelaFonte(PASTA, registraAtualizacao).catch(e => ({ motivo: e.message }));
+            registraAtualizacao(r.atualizou ? `${r.commits} commit(s) novo(s)${r.dependencias ? ', dependências instaladas' : ''}` : r.motivo);
+            // O app desktop mudou junto: reabre para carregar a versão nova dele também
+            if (r.atualizou && r.desktopMudou) { app.relaunch(); return app.exit(0); }
+            if (r.atualizou) avisoAtualizado = `Red Code atualizado pelo GitHub: ${r.commits} commit(s) novo(s).`;
+        }
         sobeServidor();
         if (!(await esperaServidor())) { criaJanela(); mostraErro(`O servidor não respondeu na porta ${PORTA}. Veja o log em ${ARQ_LOG}.`); }
     }
     if (!janela) criaJanela();
     atualizaBandeja();
+    if (avisoAtualizado && bandeja.displayBalloon) bandeja.displayBalloon({ title: 'Red Code', content: avisoAtualizado });
+    // Rodando pelo exe: confere se há release nova no GitHub (depois de abrir, sem atrasar a janela)
+    if (EMPACOTADO) setTimeout(verificaRelease, 8000);
     if (!globalShortcut.register('Control+Shift+Space', alternaJanela)) console.log('Atalho Ctrl+Shift+Espaço já está em uso por outro programa');
 });
 
-app.on('before-quit', () => { saindo = true; guardaJanela(); });
+app.on('before-quit', () => {
+    saindo = true; guardaJanela();
+    // Versão nova baixada (exe): troca a pasta do programa assim que tudo fechar
+    if (atualizacaoPronta) { atualizacao.aplicaAoSair(atualizacaoPronta, path.dirname(process.execPath), process.execPath, reabrirAposAtualizar, PASTA_DADOS); atualizacaoPronta = null; }
+});
+
+// ---------- Atualização ----------
+let avisoAtualizado = '';
+let atualizacaoPronta = null;     // exe: pasta "Red Code" nova, já baixada e extraída
+let reabrirAposAtualizar = false;
+function registraAtualizacao(texto) {
+    try { fs.appendFileSync(ARQ_LOG, `[${new Date().toLocaleString('pt-BR')}] atualização: ${texto}\n`); } catch (e) { /* sem log */ }
+}
+const janelaViva = () => (janela && !janela.isDestroyed() ? janela : null);
+async function verificaRelease() {
+    let info;
+    try { info = await atualizacao.releaseNova(app.getVersion()); }
+    catch (e) { return registraAtualizacao('não deu para conferir as releases: ' + e.message); }
+    if (!info) return registraAtualizacao(`já está na última versão (${app.getVersion()})`);
+    const { response } = await dialog.showMessageBox(janelaViva(), {
+        type: 'info', title: 'Red Code', buttons: ['Atualizar', 'Agora não'], defaultId: 0, cancelId: 1,
+        message: `Versão ${info.versao} disponível (você está na ${app.getVersion()}).`,
+        detail: (info.notas ? info.notas.slice(0, 700) + '\n\n' : '') + `Download de ${Math.round(info.tamanho / 1048576)} MB. A troca acontece quando o Red Code fechar; seus dados não mudam.`,
+    });
+    if (response !== 0) return registraAtualizacao(`versão ${info.versao} adiada`);
+    try {
+        const novo = await atualizacao.preparaRelease(info, PASTA_DADOS, (p) => { const j = janelaViva(); if (j) j.setProgressBar(p); }, registraAtualizacao);
+        if (janelaViva()) janelaViva().setProgressBar(-1);
+        atualizacaoPronta = novo;
+        registraAtualizacao(`versão ${info.versao} pronta para instalar`);
+        const r = await dialog.showMessageBox(janelaViva(), {
+            type: 'info', title: 'Red Code', buttons: ['Reiniciar agora', 'Quando eu fechar'], defaultId: 0, cancelId: 1,
+            message: `Versão ${info.versao} baixada.`,
+            detail: 'Reiniciar agora instala e abre de novo. Se preferir, ela entra quando você sair do Red Code.',
+        });
+        if (r.response === 0) { reabrirAposAtualizar = true; sairComConfirmacao(); }
+    } catch (e) {
+        if (janelaViva()) janelaViva().setProgressBar(-1);
+        registraAtualizacao('falhou: ' + e.message);
+        dialog.showMessageBox(janelaViva(), { type: 'warning', title: 'Red Code', message: 'Não deu para atualizar agora.', detail: e.message + '\n\nVocê pode baixar a versão nova em ' + info.pagina });
+    }
+}
 app.on('will-quit', () => { globalShortcut.unregisterAll(); });
 // Janela escondida não fecha o app (fica na bandeja)
 app.on('window-all-closed', () => {});
