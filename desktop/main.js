@@ -587,8 +587,8 @@ app.whenReady().then(async () => {
     if (!janela) criaJanela();
     atualizaBandeja();
     if (avisoAtualizado && bandeja.displayBalloon) bandeja.displayBalloon({ title: 'Red Code', content: avisoAtualizado });
-    // Rodando pelo exe: confere se há release nova no GitHub (depois de abrir, sem atrasar a janela)
-    if (EMPACOTADO) setTimeout(verificaRelease, 8000);
+    // Confere se há versão nova (release pelo exe, commits pelo código) e avisa num cartão no rodapé
+    iniciaVigiaAtualizacao();
     if (!globalShortcut.register('Control+Shift+Space', alternaJanela)) console.log('Atalho Ctrl+Shift+Espaço já está em uso por outro programa');
 });
 
@@ -596,6 +596,8 @@ app.on('before-quit', () => {
     saindo = true; guardaJanela();
     // Versão nova baixada (exe): troca a pasta do programa assim que tudo fechar
     if (atualizacaoPronta) { atualizacao.aplicaAoSair(atualizacaoPronta, path.dirname(process.execPath), process.execPath, reabrirAposAtualizar, PASTA_DADOS); atualizacaoPronta = null; }
+    // Pelo código: "Reiniciar" do cartão reabre o app (e o git pull roda ao abrir)
+    else if (reabrirAposAtualizar && !EMPACOTADO) app.relaunch();
 });
 
 // ---------- Atualização ----------
@@ -606,34 +608,65 @@ function registraAtualizacao(texto) {
     try { fs.appendFileSync(ARQ_LOG, `[${new Date().toLocaleString('pt-BR')}] atualização: ${texto}\n`); } catch (e) { /* sem log */ }
 }
 const janelaViva = () => (janela && !janela.isDestroyed() ? janela : null);
-async function verificaRelease() {
-    let info;
-    try { info = await atualizacao.releaseNova(app.getVersion()); }
-    catch (e) { return registraAtualizacao('não deu para conferir as releases: ' + e.message); }
-    if (!info) return registraAtualizacao(`já está na última versão (${app.getVersion()})`);
-    const { response } = await dialog.showMessageBox(janelaViva(), {
-        type: 'info', title: 'Red Code', buttons: ['Atualizar', 'Agora não'], defaultId: 0, cancelId: 1,
-        message: `Versão ${info.versao} disponível (você está na ${app.getVersion()}).`,
-        detail: (info.notas ? info.notas.slice(0, 700) + '\n\n' : '') + `Download de ${Math.round(info.tamanho / 1048576)} MB. A troca acontece quando o Red Code fechar; seus dados não mudam.`,
-    });
-    if (response !== 0) return registraAtualizacao(`versão ${info.versao} adiada`);
+// Estado da atualização, mostrado num cartão no rodapé da lista (a página pede e recebe pelo preload)
+let estadoAtualizacao = { fase: 'nada' };
+let dispensadaNestaSessao = '';
+function mudaAtualizacao(mudancas) {
+    estadoAtualizacao = { ...estadoAtualizacao, ...mudancas };
+    const j = janelaViva();
+    if (j) j.webContents.send('painel:atualizacao', estadoAtualizacao);
+}
+// Confere ao abrir e depois de tempos em tempos: exe = release nova no GitHub; código = commits novos no GitHub
+async function verificaAtualizacao() {
+    if (['baixando', 'pronta'].includes(estadoAtualizacao.fase)) return;
+    if (EMPACOTADO) {
+        let info;
+        try { info = await atualizacao.releaseNova(app.getVersion()); }
+        catch (e) { return registraAtualizacao('não deu para conferir as releases: ' + e.message); }
+        if (!info) return registraAtualizacao(`já está na última versão (${app.getVersion()})`);
+        if (dispensadaNestaSessao === info.versao) return;
+        registraAtualizacao(`versão ${info.versao} disponível`);
+        releaseDisponivel = info;
+        mudaAtualizacao({ fase: 'disponivel', modo: 'exe', versao: info.versao, atual: app.getVersion(), tamanho: info.tamanho, notas: info.notas });
+    } else {
+        const n = await atualizacao.atrasoFonte(PASTA);
+        if (!n || dispensadaNestaSessao === 'git:' + n) return;
+        mudaAtualizacao({ fase: 'disponivel', modo: 'git', commits: n });
+    }
+}
+let releaseDisponivel = null;
+async function baixaAtualizacao() {
+    if (!releaseDisponivel || estadoAtualizacao.fase === 'baixando') return;
+    mudaAtualizacao({ fase: 'baixando', progresso: 0 });
     try {
-        const novo = await atualizacao.preparaRelease(info, PASTA_DADOS, (p) => { const j = janelaViva(); if (j) j.setProgressBar(p); }, registraAtualizacao);
+        let ultimo = 0;
+        const novo = await atualizacao.preparaRelease(releaseDisponivel, PASTA_DADOS, (p) => {
+            const j = janelaViva(); if (j) j.setProgressBar(p);
+            if (p - ultimo >= 0.01 || p === 1) { ultimo = p; mudaAtualizacao({ progresso: p }); }
+        }, registraAtualizacao);
         if (janelaViva()) janelaViva().setProgressBar(-1);
         atualizacaoPronta = novo;
-        registraAtualizacao(`versão ${info.versao} pronta para instalar`);
-        const r = await dialog.showMessageBox(janelaViva(), {
-            type: 'info', title: 'Red Code', buttons: ['Reiniciar agora', 'Quando eu fechar'], defaultId: 0, cancelId: 1,
-            message: `Versão ${info.versao} baixada.`,
-            detail: 'Reiniciar agora instala e abre de novo. Se preferir, ela entra quando você sair do Red Code.',
-        });
-        if (r.response === 0) { reabrirAposAtualizar = true; sairComConfirmacao(); }
+        registraAtualizacao(`versão ${releaseDisponivel.versao} pronta para instalar`);
+        mudaAtualizacao({ fase: 'pronta' });
     } catch (e) {
         if (janelaViva()) janelaViva().setProgressBar(-1);
         registraAtualizacao('falhou: ' + e.message);
-        dialog.showMessageBox(janelaViva(), { type: 'warning', title: 'Red Code', message: 'Não deu para atualizar agora.', detail: e.message + '\n\nVocê pode baixar a versão nova em ' + info.pagina });
+        mudaAtualizacao({ fase: 'erro', erro: e.message });
     }
 }
+function iniciaVigiaAtualizacao() {
+    setTimeout(verificaAtualizacao, 8000);
+    setInterval(verificaAtualizacao, EMPACOTADO ? 6 * 3600e3 : 30 * 60e3).unref();
+}
+ipcMain.handle('painel:atualizacao-estado', (ev) => (janela && ev.sender === janela.webContents) ? estadoAtualizacao : null);
+ipcMain.handle('painel:atualizacao-acao', (ev, acao) => {
+    if (!janela || ev.sender !== janela.webContents) return null;
+    if (acao === 'baixar') baixaAtualizacao();
+    else if (acao === 'dispensar') { dispensadaNestaSessao = estadoAtualizacao.modo === 'git' ? 'git:' + estadoAtualizacao.commits : estadoAtualizacao.versao; mudaAtualizacao({ fase: 'nada' }); }
+    // Reiniciar: exe = instala a pasta nova ao sair e reabre; código = reabre (o git pull acontece ao abrir)
+    else if (acao === 'reiniciar') { reabrirAposAtualizar = true; sairComConfirmacao(); }
+    return estadoAtualizacao;
+});
 app.on('will-quit', () => { globalShortcut.unregisterAll(); });
 // Janela escondida não fecha o app (fica na bandeja)
 app.on('window-all-closed', () => {});

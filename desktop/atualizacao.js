@@ -44,6 +44,17 @@ async function pelaFonte(pasta, log) {
     return { atualizou: true, commits: faltam, dependencias, desktopMudou: mudou.some(a => a.startsWith('desktop/')) };
 }
 
+// Só confere (sem puxar): quantos commits novos há no GitHub; 0 se a pasta tem alteração local ou sem rede
+async function atrasoFonte(pasta) {
+    const git = (args, tempo = 15000) => roda('git', ['-C', pasta, ...args], pasta, tempo);
+    try {
+        if (await git(['status', '--porcelain', '--untracked-files=no'])) return 0;
+        await git(['rev-parse', '--abbrev-ref', '@{u}']);
+        await git(['fetch', '--quiet'], 20000);
+        return Number(await git(['rev-list', '--count', 'HEAD..@{u}'])) || 0;
+    } catch (e) { return 0; }
+}
+
 // ---------- Pelo exe (releases do GitHub) ----------
 function pedeJson(url) {
     return new Promise((resolve, reject) => {
@@ -125,4 +136,4 @@ function aplicaAoSair(novo, pastaApp, exe, reabrir, pastaDados) {
     spawn('cmd.exe', ['/c', 'start', '""', '/min', 'powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script, '-De', novo, '-Para', pastaApp, '-Exe', exe, '-Abrir', reabrir ? '1' : '0'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
 }
 
-module.exports = { pelaFonte, releaseNova, preparaRelease, aplicaAoSair, maisNova };
+module.exports = { pelaFonte, atrasoFonte, releaseNova, preparaRelease, aplicaAoSair, maisNova };

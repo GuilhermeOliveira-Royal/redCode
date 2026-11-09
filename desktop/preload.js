@@ -12,4 +12,10 @@ contextBridge.exposeInMainWorld('painelDesktop', {
     inicioWindows: () => ipcRenderer.invoke('painel:inicio-windows'),
     defineInicioWindows: (ligar) => ipcRenderer.invoke('painel:define-inicio-windows', !!ligar),
     abrirLogs: () => ipcRenderer.invoke('painel:abrir-logs'),
+    // Versão nova (cartão no rodapé): estado atual, avisos de mudança e ações (baixar, reiniciar, dispensar)
+    atualizacao: {
+        estado: () => ipcRenderer.invoke('painel:atualizacao-estado'),
+        acao: (acao) => ipcRenderer.invoke('painel:atualizacao-acao', String(acao)),
+        aoMudar: (fn) => ipcRenderer.on('painel:atualizacao', (ev, estado) => fn(estado)),
+    },
 });

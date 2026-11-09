@@ -1592,6 +1592,20 @@ body.lista-escondida .rodape-sessoes { display: none; }
 /* Player do que está tocando no Windows */
 .player-midia { position: relative; overflow: hidden; display: flex; align-items: center; gap: 9px; padding: 7px 5px 9px 7px; border: 1px solid var(--linha); border-radius: 11px; background: var(--folha); animation: playerEntra .35s cubic-bezier(.2, .8, .2, 1); }
 @keyframes playerEntra { from { opacity: 0; transform: translateY(6px); } }
+/* Versão nova: cartão acima do player (app desktop avisa; pelo exe baixa e instala, pelo código reabre e puxa) */
+.cartao-atualizacao { position: relative; overflow: hidden; display: flex; align-items: center; gap: 9px; margin-bottom: 8px; padding: 8px 8px 8px 9px; border-radius: 11px; border: 1px solid color-mix(in srgb, var(--voce) 55%, var(--linha)); background: color-mix(in srgb, var(--voce) 12%, var(--folha)); font-size: 12.5px; color: var(--tinta); animation: playerEntra .35s cubic-bezier(.2, .8, .2, 1); }
+.cartao-atualizacao .ca-ic { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--voce); color: #fff; }
+.cartao-atualizacao .ca-tx { flex: 1; min-width: 0; line-height: 1.25; }
+.cartao-atualizacao .ca-tx b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cartao-atualizacao .ca-tx small { display: block; color: var(--grafite); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cartao-atualizacao .ca-bt { flex: none; padding: 5px 10px; border-radius: 7px; background: var(--voce); color: #fff; font: 600 12px var(--sans); transition: filter .15s; }
+.cartao-atualizacao .ca-bt:hover { filter: brightness(1.1); }
+.cartao-atualizacao .ca-bt:disabled { opacity: .55; pointer-events: none; }
+.cartao-atualizacao .ca-x { position: absolute; top: 2px; right: 4px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; color: var(--grafite); font-size: 13px; line-height: 1; opacity: 0; transition: opacity .15s; }
+.cartao-atualizacao:hover .ca-x { opacity: 1; }
+.cartao-atualizacao .ca-x:hover { color: var(--tinta); background: var(--realce); }
+.cartao-atualizacao .ca-prog { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--voce); transition: width .4s ease; }
+.cartao-atualizacao.erro { border-color: color-mix(in srgb, var(--erro) 55%, var(--linha)); background: color-mix(in srgb, var(--erro) 10%, var(--folha)); }
 .player-midia .pm-capa { width: 36px; height: 36px; flex: none; border-radius: 7px; object-fit: cover; background: var(--realce); }
 .player-midia .pm-capa.sem { display: grid; place-items: center; color: var(--grafite); }
 .player-midia .pm-textos { flex: 1; min-width: 0; }
@@ -1990,6 +2004,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         <div class="resumo-status" id="resumoStatus" aria-live="polite"></div>
         <div class="lista" id="listaSessoes"></div>
         <div class="rodape-sessoes" id="rodapeSessoes">
+            <div class="cartao-atualizacao" id="cartaoAtualizacao" hidden></div>
             <div class="player-midia" id="playerMidia" hidden></div>
             <div class="rodape-pilulas" aria-hidden="true"></div>
         </div>
@@ -2530,6 +2545,35 @@ document.getElementById('avisoVersao').addEventListener('click', async (ev) => {
 });
 verificaVersao();
 setInterval(verificaVersao, 15000);
+
+/* ---------- Versão nova: cartão no rodapé (só no app desktop) ---------- */
+const cartaoAtualizacao = document.getElementById('cartaoAtualizacao');
+const ICONE_ATUALIZA = '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/></svg>';
+function desenhaAtualizacao(e) {
+    if (!e || e.fase === 'nada') { cartaoAtualizacao.hidden = true; return; }
+    const mb = e.tamanho ? Math.round(e.tamanho / 1048576) + ' MB' : '';
+    let titulo, sub, botao = '', acao = '', prog = '';
+    if (e.fase === 'disponivel' && e.modo === 'git') { titulo = plural(e.commits, 'novidade no GitHub', 'novidades no GitHub'); sub = 'reinicie para puxar'; botao = 'Reiniciar'; acao = 'reiniciar'; }
+    else if (e.fase === 'disponivel') { titulo = `Versão ${e.versao}`; sub = 'disponível para instalar'; botao = 'Atualizar'; acao = 'baixar'; }
+    else if (e.fase === 'baixando') { const p = Math.round((e.progresso || 0) * 100); titulo = `Baixando a ${e.versao || 'versão nova'}`; sub = p + '%'; botao = 'Aguarde'; prog = `<span class="ca-prog" style="width:${p}%"></span>`; }
+    else if (e.fase === 'pronta') { titulo = `Versão ${e.versao} pronta`; sub = 'reinicie para usar'; botao = 'Reiniciar'; acao = 'reiniciar'; }
+    else if (e.fase === 'erro') { titulo = 'Não deu para atualizar'; sub = e.erro || ''; botao = 'Tentar'; acao = 'baixar'; }
+    cartaoAtualizacao.classList.toggle('erro', e.fase === 'erro');
+    cartaoAtualizacao.innerHTML = `<span class="ca-ic">${ICONE_ATUALIZA}</span><span class="ca-tx"><b>${esc(titulo)}</b><small title="${esc(sub)}">${esc(sub)}</small></span>
+        <button type="button" class="ca-bt" ${acao ? `data-atualizacao="${acao}"` : 'disabled'} ${acao === 'baixar' && mb ? `title="Download de ${mb}"` : ''}>${esc(botao)}</button>
+        ${e.fase === 'baixando' ? '' : '<button type="button" class="ca-x" data-atualizacao="dispensar" aria-label="Agora não">×</button>'}${prog}`;
+    cartaoAtualizacao.hidden = false;
+}
+cartaoAtualizacao.addEventListener('click', async (ev) => {
+    const b = ev.target.closest('[data-atualizacao]');
+    if (!b || !window.painelDesktop || !window.painelDesktop.atualizacao) return;
+    b.disabled = true;
+    try { desenhaAtualizacao(await window.painelDesktop.atualizacao.acao(b.dataset.atualizacao)); } catch (e) { recado(e.message); }
+});
+if (window.painelDesktop && window.painelDesktop.atualizacao && !JANELA_SECUNDARIA) {
+    window.painelDesktop.atualizacao.aoMudar(desenhaAtualizacao);
+    window.painelDesktop.atualizacao.estado().then(desenhaAtualizacao).catch(() => { /* app antigo */ });
+}
 
 /* ---------- Player do rodapé: o que está tocando no Windows (Spotify, YouTube no navegador...) ---------- */
 const playerMidia = document.getElementById('playerMidia');
