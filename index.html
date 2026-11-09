@@ -1787,6 +1787,8 @@ body.layout-editor .filtro { font-size: 12px; }
 .ev-lin.add { background: #3fb95014; } .ev-lin.atual { background: #ffffff0a; } .ev-lin.add.atual { background: #3fb95026; }
 .ev-lin.del { background: #f851491f; } .ev-lin.del .ev-tx { text-decoration: line-through; text-decoration-color: #f8514988; opacity: .75; }
 .ev-sep { color: #5c4c4e; padding-left: 10ch; height: 20px; font-size: 12px; }
+.ev-sep.ev-mais { display: block; width: 100%; text-align: left; font: 12px var(--mono, monospace); cursor: pointer; }
+.ev-sep.ev-mais:hover { color: var(--voce); text-decoration: underline; }
 /* Formatação do VS Code (tema Dark Modern + cores Dark+) */
 body.layout-editor .editor-vivo { background: #1f1f1f; }
 .ev-topo { background: #181818; }
@@ -2015,6 +2017,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <div class="ev-acoes">
                 <button type="button" id="evSeguir" aria-pressed="true" title="Pular para cada edição nova do Claude (desligue para ficar no arquivo que você escolheu)">⟳ Seguindo</button>
                 <button type="button" id="evFormatar" aria-pressed="false" title="Ver o arquivo formatado como o Alt+Shift+F do VS Code (só visualização: o arquivo não muda). Atalho: Alt+Shift+F">{ } Formatar</button>
+                <button type="button" id="evCopiar" title="Copiar o arquivo inteiro">Copiar</button>
                 <button type="button" id="evVscode" title="Abrir este arquivo no VS Code, na linha da edição">VS Code</button>
                 <button type="button" id="evEditor" title="Abrir no editor do Red Code">Editor</button>
                 <button type="button" id="evPainel" title="Painel de agentes e Git" aria-label="Painel de agentes e Git">▥</button>
@@ -2095,7 +2098,6 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
     <section class="uso-plano" id="usoPlano" aria-label="Limites de uso do plano" hidden></section>
 </div>
 <div class="botoes-cantos">
-    <button type="button" id="btnDetalhes" aria-pressed="false" title="Mostrar ou esconder os detalhes da conversa (modelo, saúde, números)" aria-label="Detalhes da conversa">ⓘ</button>
     <button type="button" id="btnLateral" aria-pressed="false" title="Mostrar ou esconder o painel de agentes e Git" aria-label="Painel lateral">▥</button>
 </div>
 <div class="alca-coluna" data-alca="sessoes" title="Arraste para mudar a largura da lista (duplo clique volta ao padrão)" hidden></div>
@@ -5854,6 +5856,22 @@ function limiteEsforcoAgente(a) {
             <select data-limite-esforco aria-label="Esforço máximo de ${esc(a.nome)} neste computador">${opcoes.map(([v, n]) => `<option value="${v}" ${(a.limiteEsforco || '') === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
         </label>`;
 }
+// Agentes que já vêm no Claude Code: não têm arquivo, então não dá para editar nem desligar; só ver e personalizar o mascote
+const AGENTES_EMBUTIDOS = [
+    ['general-purpose', 'Agente geral: pesquisa, busca e tarefas de vários passos. É o que o Claude chama quando nenhum outro serve.'],
+    ['Explore', 'Busca rápida no código: acha arquivos, trechos e responde onde/como algo funciona, só lendo.'],
+    ['Plan', 'Planeja a implementação: lê o código e devolve um plano passo a passo, sem alterar nada.'],
+];
+function grupoEmbutidos() {
+    return `<div class="config-grupo-agentes">
+            <h4>Do Claude Code <span class="etiqueta">embutidos</span><small>vêm com o Claude Code, sem arquivo</small></h4>
+            ${AGENTES_EMBUTIDOS.map(([nome, desc]) => `<div class="config-agente" data-busca="${esc(semAcento(nome + ' ' + desc))}">
+                <div class="config-agente-cab">${petMini(nome, false)}<b>${esc(nome)}</b><span class="config-agente-modelo">igual à conversa</span></div>
+                <p>${esc(desc)}</p>
+                <div class="config-agente-acoes"><button class="mini" data-personalizar-pet="${esc(nome)}" title="Escolher como o mascote deste agente se parece">🎨 Personalizar</button></div>
+            </div>`).join('')}
+        </div>`;
+}
 function desenhaRegras(r, cwd) {
     regrasAtuais = r;
     // Ordem: o projeto da conversa aberta, depois os seus, depois os outros projetos (A-Z)
@@ -5871,7 +5889,7 @@ function desenhaRegras(r, cwd) {
     return `<div class="config-titulo-linha"><h3 class="config-titulo">Subagentes</h3><button class="mini" data-agente-criar>+ Novo agente</button></div>
         <div id="formNovoAgente" hidden>${formAgente(null, escopos)}</div>
         <p class="nota">Quem o Claude pode chamar para dividir o trabalho, por onde estão definidos. Mudanças valem nas conversas que começarem depois; cada alteração guarda uma cópia do arquivo antes em ~/.claude/backups.</p>`
-        + (agentes || '<p class="nota">Nenhum subagente definido.</p>')
+        + (agentes || '<p class="nota">Nenhum subagente definido.</p>') + grupoEmbutidos()
         + '<h3 class="config-titulo">Regras</h3>'
         + `<p class="nota">O que entra em toda conversa${cwd ? ' desta pasta' : ''}: suas instruções e as do projeto. Clique para ler.</p>`
         + (regras || '<p class="nota">Nenhuma instrução encontrada.</p>');
@@ -7661,7 +7679,7 @@ try { const v = localStorage.getItem('painelVisualCodigo'); if (v && VISUAIS_COD
 const LARGURA_MIN_EDITOR = 1280;
 const ev = {
     ligado: false, timerSaida: null, sessao: null, vistos: new Set(), fila: [], geracao: 0, rodandoFila: false,
-    seguir: true, ultimaLinha: new Map(), ultimaEdicao: new Map(), ordem: [], arquivo: null, linha: 1,
+    seguir: true, expandidos: new Set(), ultimaLinha: new Map(), ultimaEdicao: new Map(), ordem: [], arquivo: null, linha: 1,
 };
 const elEv = (id) => document.getElementById(id);
 
@@ -8025,8 +8043,9 @@ async function montaCenas(e) {
     const todas = conteudo !== null ? conteudo.split('\n') : null;
     const cenas = [];
     if (e.codigo.tipo === 'arquivo') {
-        const linhasNovas = todas ? todas.slice(0, 80) : String(e.codigo.conteudo.texto || '').split('\n');
-        cenas.push({ antes: [], depois: linhasNovas, ctxAntes: [], ctxDepois: [], inicio: 1, nota: e.codigo.conteudo.cortado || (todas && todas.length > 80) ? `… (+${Math.max(0, (todas ? todas.length : e.codigo.conteudo.total) - 80)} linhas)` : '', real: !!todas });
+        const limite = ev.expandidos.has(String(e.texto).toLowerCase()) ? Infinity : 80;
+        const linhasNovas = todas ? todas.slice(0, limite) : String(e.codigo.conteudo.texto || '').split('\n');
+        cenas.push({ antes: [], depois: linhasNovas, ctxAntes: [], ctxDepois: [], inicio: 1, nota: limite === Infinity ? '' : e.codigo.conteudo.cortado || (todas && todas.length > 80) ? `… (+${Math.max(0, (todas ? todas.length : e.codigo.conteudo.total) - 80)} linhas)` : '', real: !!todas });
         return { cenas, info };
     }
     for (const t of e.codigo.trocas || []) {
@@ -8035,11 +8054,12 @@ async function montaCenas(e) {
         if (loc) {
             const tamanho = Math.max(1, t.depois.total || String(t.depois.texto).split('\n').length);
             const ini = Math.max(1, loc.linha - 12);
+            const maximo = ev.expandidos.has(String(e.texto).toLowerCase()) ? Infinity : 120;
             cenas.push({
-                antes: t.antes.texto ? antes : [], depois: todas.slice(loc.linha - 1, loc.linha - 1 + Math.min(tamanho, 120)),
+                antes: t.antes.texto ? antes : [], depois: todas.slice(loc.linha - 1, loc.linha - 1 + Math.min(tamanho, maximo)),
                 ctxAntes: todas.slice(ini - 1, loc.linha - 1), ctxDepois: todas.slice(loc.linha - 1 + tamanho, loc.linha - 1 + tamanho + 12),
                 inicio: ini, linhaEdicao: loc.linha, real: true,
-                nota: loc.aprox ? 'posição aproximada' : (tamanho > 120 ? `… (+${tamanho - 120} linhas)` : ''),
+                nota: loc.aprox ? 'posição aproximada' : (tamanho > maximo ? `… (+${tamanho - 120} linhas)` : ''),
             });
             if (conversa === sessaoAtual) ev.ultimaLinha.set(e.texto.toLowerCase(), loc.linha);
         } else {
@@ -8066,7 +8086,7 @@ function desenhaLinhasEv(linhas, rolar) {
     const el = elEv('evCodigo');
     const st = { nivel: 0, bloco: null, crase: false, css: /\.(css|scss|less)$/i.test(ev.arquivo || ''), nivelCss: 0 };
     el.innerHTML = linhas.map(l => {
-        if (l.sep) { st.bloco = null; return `<div class="ev-sep">⋯${l.nota ? ' ' + esc(l.nota) : ''}</div>`; }
+        if (l.sep) { st.bloco = null; return l.nota && l.nota.startsWith('…') ? `<button type="button" class="ev-sep ev-mais" data-ev-expandir title="Mostrar o arquivo inteiro">⋯ ${esc(l.nota)} · mostrar tudo</button>` : `<div class="ev-sep">⋯${l.nota ? ' ' + esc(l.nota) : ''}</div>`; }
         // linha que está saindo não conta para o nível (ela vai sumir)
         const html = l.tipo === 'del' ? esc(l.tx) : realcaLinhaVs(l.tx, st);
         return `<div class="ev-lin ${l.tipo || ''} ${l.atual ? 'atual' : ''}"><span class="ev-gut"></span><span class="ev-num">${l.num ?? ''}</span><span class="ev-tx" style="--recuo:${(String(l.tx || '').match(/^[ \t]*/)[0].replace(/\t/g, '    ').length)}">${html || ' '}${l.cursor ? '<span class="ev-cursor"></span>' : ''}</span></div>`;
@@ -8096,7 +8116,7 @@ function linhasFinais(c, comAdd = true) {
 async function mostraEdicao(e, animar) {
     const g = ev.geracao;
     const outroArquivo = ev.arquivo !== e.texto;
-    ev.arquivo = e.texto; desenhaAbasEv(); trilhaEv(e.texto);
+    ev.arquivo = e.texto; ev.edicaoMostrada = e; desenhaAbasEv(); trilhaEv(e.texto);
     if (outroArquivo) {
         const cod = elEv('evCodigo');
         cod.classList.remove('ev-abrindo');
@@ -8278,6 +8298,22 @@ elEv('evSeguir').addEventListener('click', () => {
 });
 elEv('evFormatar').setAttribute('aria-pressed', String(ev.formatado));
 elEv('evFormatar').addEventListener('click', alternaFormatado);
+// "mostrar tudo": a aba do arquivo passa a mostrar o arquivo inteiro (até fechar o editor)
+elEv('evCodigo').addEventListener('click', (evt) => {
+    if (!evt.target.closest('[data-ev-expandir]') || !ev.arquivo) return;
+    ev.expandidos.add(String(ev.arquivo).toLowerCase());
+    if (ev.edicaoMostrada) mostraEdicao(ev.edicaoMostrada, false).catch(() => {});
+});
+// Copiar: o conteúdo atual do arquivo (lido de novo do disco, não só o trecho mostrado)
+elEv('evCopiar').addEventListener('click', async () => {
+    if (!ev.arquivo) return recado('Nenhum arquivo aberto no editor.');
+    try {
+        const info = await leArquivoEv(ev.arquivo);
+        if (!info || info.conteudo == null) return recado('Não deu para ler o arquivo.');
+        await navigator.clipboard.writeText(info.conteudo);
+        recado('Arquivo copiado (' + plural(info.conteudo.split('\n').length, 'linha', 'linhas') + ')');
+    } catch (e) { recado('Não deu para copiar: ' + e.message); }
+});
 // Quebra de linha: ligada por padrão; Alt+Z alterna (igual ao VS Code)
 let quebraLinha = true;
 try { quebraLinha = localStorage.getItem('painelEditorQuebra') !== '0'; } catch (e) { /* sem armazenamento */ }
@@ -8441,7 +8477,9 @@ setInterval(atualizaChat, 1000);
 
 // Visual minimalista: detalhes da conversa e painel lateral começam escondidos; a escolha fica guardada
 (function () {
-    const alternancias = [['btnDetalhes', 'ver-detalhes', 'painelVerDetalhes'], ['btnLateral', 'lateral-aberta', 'painelLateralAberta']];
+    // (o botão ⓘ dos detalhes saiu: os detalhes ficam escondidos)
+    document.body.classList.remove('ver-detalhes');
+    const alternancias = [['btnLateral', 'lateral-aberta', 'painelLateralAberta']];
     for (const [id, classe, chave] of alternancias) {
         const botao = document.getElementById(id);
         const aplica = (ligado) => { document.body.classList.toggle(classe, ligado); botao.setAttribute('aria-pressed', String(ligado)); };
