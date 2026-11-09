@@ -945,7 +945,8 @@ button.grafo-linha:hover { background: var(--folha); }
 /* O rodapé desconta a barra de rolagem da conversa, para as bordas baterem */
 .compositor { padding-right: calc(28px + var(--barra, 0px)); }
 .compositor > *, .compositor > form.caixa-mensagem { max-width: var(--coluna); margin-left: auto; margin-right: auto; }
-.compositor .pedido-voce, .compositor .alerta-contexto, .compositor .situacao-chat { max-width: none; }
+.compositor .pedido-voce, .compositor .alerta-contexto { max-width: none; }
+.compositor .situacao-chat { max-width: var(--coluna); margin-left: auto; margin-right: auto; }
 .msg .balao { max-width: min(78%, 720px); }
 
 /* ---------- Linha do tempo em formato de chat ---------- */
@@ -2714,6 +2715,7 @@ function desenhaUso() {
     if (!u) return;
     if (!JANELA_SECUNDARIA) avisaLimite(u);
     el.classList.toggle('minimizado', usoMinimizado);
+    if (!usoMinimizado) el.style.maxWidth = '';
     if (usoMinimizado) {
         // Resumo: sessão e o semanal geral (o maior uso decide a cor)
         const curto = u.limites.filter(l => l.grupo === 'session' || /todos/.test(l.nome)).map(l => ({ nome: l.grupo === 'session' ? 'Sessão' : 'Semanal', p: l.percentual }));
@@ -6899,7 +6901,7 @@ let comentariosNaFila = [];
 let ultimasPrevias = null;
 function miniaturasPrevias(imagens) {
     if (!imagens || !imagens.length) return '';
-    return `<div class="miniaturas">${imagens.map(src => /^data:image\//.test(src) ? `<span class="miniatura"><img src="${src}" alt="Imagem enviada"></span>` : '').join('')}</div>`;
+    return `<div class="miniaturas">${imagens.map(src => /^data:image\//.test(src) ? `<button type="button" class="miniatura" data-imagem-url="${src}" title="Clique para ampliar"><img src="${src}" alt="Imagem enviada"></button>` : '').join('')}</div>`;
 }
 let chaveNova = null, ultimoStatusChat = '';
 // Conversa nova nascendo: { chave, texto, cwd, modelo, esforco, inicio, erro }. Enquanto existe, a área
