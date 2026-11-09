@@ -125,7 +125,13 @@ Na janela de **Nova conversa** você escolhe o projeto, a cópia isolada (worktr
 
 ## Instalação
 
-Ainda não há versão pronta publicada na página de Releases do repositório. Rode pelo código ou gere você mesmo o exe portátil.
+### Baixar o exe pronto (recomendado)
+
+1. Na página de [Releases](https://github.com/HickysDev/redCode/releases/latest), baixe o `RedCode-portatil-win64.zip`.
+2. Extraia a pasta **Red Code** onde quiser (ex.: Documentos).
+3. Abra o **Red Code.exe**. Não precisa instalar nem ter Node.
+
+Os dados e logs ficam em `%APPDATA%\Red Code`, então dá para trocar a pasta por uma versão nova sem perder nada.
 
 ### Rodar pelo código
 

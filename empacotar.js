@@ -14,7 +14,7 @@ const ELECTRON = path.join(RAIZ, 'node_modules', 'electron', 'dist');
 const pacote = require('./package.json');
 
 // Só o código do app. Dados pessoais (dados.json, anexos/), testes, logs e afins ficam de fora.
-const ARQUIVOS_RAIZ = fs.readdirSync(RAIZ).filter(a => /\.(js|html|svg)$/.test(a) && a !== 'empacotar.js');
+const ARQUIVOS_RAIZ = fs.readdirSync(RAIZ).filter(a => /\.(js|html|svg|ps1)$/.test(a) && a !== 'empacotar.js');
 const ARQUIVOS_DESKTOP = fs.readdirSync(path.join(RAIZ, 'desktop')).filter(a => a.endsWith('.js'));
 
 function passo(texto) { console.log(`[${new Date().toLocaleTimeString('pt-BR')}] ${texto}`); }
