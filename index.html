@@ -1782,7 +1782,11 @@ body.layout-editor .filtro { font-size: 12px; }
 .ev-acoes button:hover { color: var(--tinta); border-color: var(--linha); }
 .ev-acoes #evSeguir[aria-pressed="true"], .ev-acoes #evFormatar[aria-pressed="true"] { color: var(--voce); }
 .ev-acoes #evFormatar { font-family: var(--mono); }
-.ev-trilha { padding: 4px 16px; font-size: 12px; color: var(--grafite); border-bottom: 1px solid var(--linha); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 25px; }
+.ev-trilha { padding: 4px 16px; font-size: 12px; color: var(--grafite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 25px; box-sizing: border-box; }
+/* Linha do caminho do arquivo + botões (a linha de cima fica inteira para as abas) */
+.ev-linha-trilha { display: flex; align-items: center; min-height: 30px; border-bottom: 1px solid var(--linha); }
+.ev-linha-trilha .ev-trilha { flex: 1; min-width: 0; display: flex; align-items: center; }
+.ev-linha-trilha .ev-acoes { padding: 0 6px; }
 .ev-trilha b { color: var(--tinta); font-weight: 500; }
 .ev-codigo { position: relative; flex: 1; min-height: 0; overflow: auto; padding: 10px 0 60px; font: 13px/20px var(--mono); }
 .ev-vazio { color: var(--grafite); padding: 60px 20px; text-align: center; font-family: var(--sans); }
@@ -2021,7 +2025,8 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         </div>
     </nav>
     <section class="editor-vivo" id="editorVivo" hidden aria-label="Editor: o que o Claude está editando">
-        <div class="ev-topo"><div class="ev-abas" id="evAbas"></div>
+        <div class="ev-topo"><div class="ev-abas" id="evAbas"></div></div>
+        <div class="ev-linha-trilha"><div class="ev-trilha" id="evTrilha"></div>
             <div class="ev-acoes">
                 <button type="button" id="evSeguir" aria-pressed="true" title="Pular para cada edição nova do Claude (desligue para ficar no arquivo que você escolheu)">⟳ Seguindo</button>
                 <button type="button" id="evFormatar" aria-pressed="false" title="Ver o arquivo formatado como o Alt+Shift+F do VS Code (só visualização: o arquivo não muda). Atalho: Alt+Shift+F">{ } Formatar</button>
@@ -2031,7 +2036,6 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                 <button type="button" id="evPainel" title="Painel de agentes e Git" aria-label="Painel de agentes e Git">▥</button>
                 <button type="button" id="evVisual" title="Visual das conversas de código" aria-label="Configurar o visual"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
             </div></div>
-        <div class="ev-trilha" id="evTrilha"></div>
         <div class="ev-codigo" id="evCodigo"><div class="ev-vazio">Quando o Claude editar um arquivo, ele aparece aqui.</div></div>
         <div class="ev-status" id="evStatus"></div>
     </section>
