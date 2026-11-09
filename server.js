@@ -952,6 +952,40 @@ async function raizGit(dir) {
 }
 // Ao vivo: o que mudou nos arquivos da conversa desde o começo do comando, versão a versão.
 // visto = { arquivo minúsculo: t da última versão já mostrada }: cada resposta traz só o que veio depois dela.
+// Duas conversas na mesma pasta (ex.: duas na royal): o vigia vê tudo o que muda no repositório. Arquivo que outra
+// conversa ativa mexeu perto daquele momento (edição direta, ou comando dela rodando que cita o arquivo) não é
+// atribuído a esta, a não ser que o comando desta também cite o arquivo.
+let cacheOutrasAtivas = { em: 0, lista: [] };
+function outrasConversasAtivas(sessao) {
+    if (Date.now() - cacheOutrasAtivas.em > 20000) {
+        const limite = Date.now() - 30 * 60e3;
+        let lista = [];
+        try { lista = listaSessoes().filter(s => (s.atualizado || 0) >= limite); } catch (e) { /* sem lista: não filtra */ }
+        cacheOutrasAtivas = { em: Date.now(), lista };
+    }
+    return cacheOutrasAtivas.lista.filter(s => s.id !== sessao);
+}
+function textoDoComando(e) { return String((e.codigo && e.codigo.entrada && e.codigo.entrada.texto) || e.texto || ''); }
+function citaArquivo(texto, abs) {
+    const t = String(texto).toLowerCase(), nome = path.basename(abs).toLowerCase();
+    return nome.length > 2 && t.includes(nome);
+}
+function deOutraConversa(sessao, abs, t, meuComando) {
+    if (meuComando && citaArquivo(textoDoComando(meuComando), abs)) return false;
+    const alvo = abs.toLowerCase();
+    for (const s of outrasConversasAtivas(sessao)) {
+        let d;
+        try { d = detalheSessao(s.projeto, s.id); } catch (e) { continue; }
+        if (!d) continue;
+        for (const e of d.eventos) {
+            const ini = Date.parse(e.hora || 0), fim = e.fim ? Date.parse(e.fim) + 5000 : Date.now();
+            if (!(t >= ini - 5000 && t <= fim)) continue;
+            if (e.tipo === 'edicao' && String(e.texto || '').toLowerCase() === alvo) return true;
+            if (e.tipo === 'comando' && citaArquivo(textoDoComando(e), abs)) return true;
+        }
+    }
+    return false;
+}
 async function alteracoesAoVivo(projeto, sessao, id, visto) {
     const d = detalheSessao(projeto, sessao);
     if (!d) return null;
@@ -964,6 +998,7 @@ async function alteracoesAoVivo(projeto, sessao, id, visto) {
         if (!raizes.some(r => k.startsWith(r + path.sep) || k.startsWith(r + '/'))) continue;
         const ult = reg.versoes[reg.versoes.length - 1];
         if (!ult || ult.t < ini || (visto[k] && ult.t <= visto[k])) continue;
+        if (deOutraConversa(sessao, reg.abs, ult.t, e)) continue;
         // Base: a última versão já mostrada; na primeira vez, a de logo antes do comando; sem ela, o commit
         let antes;
         if (visto[k]) { const v = [...reg.versoes].reverse().find(x => x.t <= visto[k]); if (v) antes = v.conteudo; }
@@ -1013,6 +1048,7 @@ async function alteracoesDoComando(projeto, sessao, id) {
         let st;
         try { st = fs.statSync(abs); } catch (x) { continue; }
         if (!st.isFile() || st.size > 3 * 1024 * 1024 || st.mtimeMs < ini || st.mtimeMs > fim) continue;
+        if (deOutraConversa(sessao, abs, st.mtimeMs, e)) continue;
         achados.push({ abs, mtime: st.mtimeMs });
     }
     achados.sort((a, b) => a.mtime - b.mtime);

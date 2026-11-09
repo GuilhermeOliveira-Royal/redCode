@@ -6,12 +6,13 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $metodos = [System.WindowsRuntimeSystemExtensions].GetMethods()
 $asTask = ($metodos | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
-function Espera($op, [Type]$tipo) { $t = $asTask.MakeGenericMethod($tipo).Invoke($null, @($op)); $t.Wait(-1) | Out-Null; $t.Result }
+# Toda chamada ao Windows tem limite: o serviço de mídia às vezes emperra (Explorer ligado há dias) e nunca responde
+function Espera($op, [Type]$tipo) { $t = $asTask.MakeGenericMethod($tipo).Invoke($null, @($op)); if (-not $t.Wait(5000)) { throw 'sem-resposta' }; $t.Result }
+function EscreveJson($obj) { [Console]::Out.WriteLine(($obj | ConvertTo-Json -Compress)); [Console]::Out.Flush() }
 [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime] | Out-Null
 [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
 [Windows.Storage.Streams.IInputStream, Windows.Storage.Streams, ContentType = WindowsRuntime] | Out-Null
 $paraStream = [System.IO.WindowsRuntimeStreamExtensions].GetMethod('AsStreamForRead', [Type[]]@([Windows.Storage.Streams.IInputStream]))
-$gerente = Espera ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager])
 
 function LeCapa($propriedades) {
     if (-not $propriedades.Thumbnail) { return $null }
@@ -29,6 +30,16 @@ $fila = New-Object 'System.Collections.Concurrent.ConcurrentQueue[string]'
 $leitor = [powershell]::Create()
 $leitor.AddScript({ param($f) $in = [Console]::In; while ($true) { $l = $in.ReadLine(); if ($null -eq $l) { $f.Enqueue('__fim__'); break }; $f.Enqueue($l) } }).AddArgument($fila) | Out-Null
 $leitor.BeginInvoke() | Out-Null
+# Pede o gerente de mídia ao Windows; sem resposta, avisa e tenta de novo a cada 15 s (a tela mostra o aviso)
+$gerente = $null
+while (-not $gerente) {
+    try { $gerente = Espera ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]::RequestAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager]) }
+    catch {
+        EscreveJson @{ erro = 'servico'; detalhe = "$($_.Exception.Message)" }
+        $comando = $null
+        for ($i = 0; $i -lt 15; $i++) { if ($fila.TryDequeue([ref]$comando) -and $comando -eq '__fim__') { exit }; Start-Sleep -Seconds 1 }
+    }
+}
 $ultimoJson = ''
 $musicaDaCapa = ''
 while ($true) {
@@ -71,7 +82,8 @@ while ($true) {
         $json = $estado | ConvertTo-Json -Compress
         if ($json -ne $ultimoJson) { [Console]::Out.WriteLine($json); [Console]::Out.Flush(); $ultimoJson = $json }
     } catch {
-        $json = (@{ erro = $_.Exception.Message } | ConvertTo-Json -Compress)
+        $msg = "$($_.Exception.Message)"
+        $json = (@{ erro = $(if ($msg -match 'sem-resposta') { 'servico' } else { $msg }) } | ConvertTo-Json -Compress)
         if ($json -ne $ultimoJson) { [Console]::Out.WriteLine($json); [Console]::Out.Flush(); $ultimoJson = $json }
     }
     Start-Sleep -Milliseconds 900

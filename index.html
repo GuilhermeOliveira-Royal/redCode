@@ -915,6 +915,8 @@ button.grafo-linha:hover { background: var(--folha); }
 .situacao-chat { font-size: 13px; margin-bottom: 8px; max-width: 1000px; }
 /* Várias perguntas do Claude: o quadro rola por dentro e a caixa de escrever continua à vista */
 #pendentes { max-height: 55vh; overflow-y: auto; overscroll-behavior: contain; }
+.corpo > #pendentes { max-height: none; overflow: visible; margin-top: 14px; }
+.corpo > #pendentes:empty { display: none; }
 .situacao-chat.erro { color: var(--erro); }
 .situacao-chat.aviso { color: var(--atencao); }
 .pedido-voce { max-width: 1000px; border: 1px solid var(--voce); background: var(--voce-fundo); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--sombra); }
@@ -1394,7 +1396,11 @@ button.partes:hover, button.partes[aria-expanded="true"] { color: var(--voce); b
 .miniatura img { display: block; max-width: 280px; max-height: 180px; object-fit: contain; }
 .miniatura:hover { border-color: var(--modelo); }
 .lupa { position: fixed; inset: 0; z-index: 40; background: rgba(12, 12, 10, .9); display: grid; place-items: center; padding: 24px; cursor: zoom-out; }
-.lupa img { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); background: #fff; }
+.lupa img { max-width: calc(100vw - 48px); max-height: calc(100vh - 48px); object-fit: contain; border-radius: 6px; box-shadow: 0 10px 40px rgba(0, 0, 0, .5); background: #fff; cursor: zoom-in; }
+/* Tamanho real (clique na imagem): rola para ver imagens altas ou largas */
+.lupa.real { overflow: auto; place-items: start center; }
+.lupa.real img { max-width: none; max-height: none; cursor: zoom-out; }
+.lupa .dica-lupa { position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%); padding: 4px 10px; border-radius: 8px; background: #000a; color: #fff; font-size: 12px; pointer-events: none; }
 .lupa .fechar-lupa { position: fixed; top: 14px; right: 18px; color: #fff; font-size: 26px; }
 @media (max-width: 760px) { .miniatura img { max-width: 100%; } }
 
@@ -1620,6 +1626,8 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .player-midia .rolando { text-overflow: clip; mask-image: linear-gradient(90deg, #000 calc(100% - 12px), transparent); }
 .player-midia .rolando .pm-rola { display: inline-block; animation: pmRola var(--tempo, 4s) ease-in-out infinite alternate; }
 @keyframes pmRola { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--desloca, 0)); } }
+.player-midia.aviso-midia { border-style: dashed; }
+.player-midia.aviso-midia .pm-titulo { font-size: 12px; }
 .player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--voce); transition: width 1s linear; }
 .player-midia.pausado .pm-prog { opacity: .45; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
@@ -2231,7 +2239,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         </div>
     </div>
 </div>
-<div class="lupa" id="lupa" hidden role="dialog" aria-label="Imagem ampliada"><button class="fechar-lupa" aria-label="Fechar">×</button><img alt="Imagem ampliada"></div>
+<div class="lupa" id="lupa" hidden role="dialog" aria-label="Imagem ampliada"><button class="fechar-lupa" aria-label="Fechar">×</button><img alt="Imagem ampliada"><span class="dica-lupa">Clique na imagem para ver no tamanho real</span></div>
 <div class="ajuda" id="janelaNova" hidden>
     <form class="caixa nova" id="formNova" role="dialog" aria-modal="true" aria-labelledby="tituloNova">
         <h2 id="tituloNova">Nova conversa</h2>
@@ -2596,8 +2604,21 @@ function montaPlayer() {
         <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
         <span class="pm-prog"></span>`;
 }
+let avisoMidiaDispensado = false;
 function desenhaMidia() {
     const m = midiaAtual;
+    // Serviço de mídia do Windows emperrado: avisa em vez de sumir (um × esconde até reabrir o Red Code)
+    if (m && m.erro === 'servico') {
+        if (avisoMidiaDispensado) { playerMidia.hidden = true; document.body.classList.remove('com-player'); return; }
+        playerMidia.classList.add('aviso-midia');
+        playerMidia.innerHTML = `<span class="pm-capa sem">${ICONE_MIDIA.nota}</span>
+            <div class="pm-textos"><div class="pm-titulo">Mídia do Windows sem resposta</div><div class="pm-artista" title="Gerenciador de Tarefas › Windows Explorer › Reiniciar (a barra de tarefas some por 2 segundos, nenhum programa fecha)">reinicie o Windows Explorer</div></div>
+            <button type="button" class="pm-btn" data-midia-dispensar title="Esconder até reabrir o Red Code" aria-label="Esconder">×</button>`;
+        playerMidia.hidden = false;
+        document.body.classList.add('com-player');
+        return;
+    }
+    if (playerMidia.classList.contains('aviso-midia')) { playerMidia.classList.remove('aviso-midia'); playerMidia.innerHTML = ''; capaMostrada = -1; }
     if (!m || m.nada || m.erro || !m.titulo) {
         // Na troca de música o Windows passa um instante sem nada: espera 5 s antes de esconder
         if (!semMidiaDesde) semMidiaDesde = Date.now();
@@ -2660,12 +2681,13 @@ async function atualizaMidia() {
     if (document.hidden || JANELA_SECUNDARIA) return;
     let m;
     try { m = await getPainel('/api/midia'); } catch (e) { return; }
-    if (m && !m.nada && !m.erro && m.titulo) midiaAtual = m;
+    if (m && (m.erro === 'servico' || (!m.nada && !m.erro && m.titulo))) midiaAtual = m;
     else if (midiaAtual && (!semMidiaDesde || Date.now() - semMidiaDesde < 5000)) { if (!semMidiaDesde) semMidiaDesde = Date.now(); return; }
     else midiaAtual = m;
     desenhaMidia();
 }
 playerMidia.addEventListener('click', async (ev) => {
+    if (ev.target.closest('[data-midia-dispensar]')) { avisoMidiaDispensado = true; return desenhaMidia(); }
     const b = ev.target.closest('[data-midia]');
     if (!b) return;
     // Resposta imediata no botão; a leitura seguinte confirma o estado real
@@ -4332,6 +4354,14 @@ async function atualizaSessao(forcar) {
     redesenha(dados);
 }
 
+// Perguntas e permissões do Claude ficam no fim da conversa (rolam com ela); sem conversa desenhada, voltam para cima da caixa.
+// É sempre o mesmo elemento (só muda de lugar): a opção marcada e o texto digitado não se perdem.
+const BLOCO_PENDENTES = document.getElementById('pendentes');
+function colocaPendentes() {
+    const corpo = document.querySelector('#principal > .corpo');
+    if (corpo) { if (BLOCO_PENDENTES.parentElement !== corpo || corpo.lastElementChild !== BLOCO_PENDENTES) corpo.appendChild(BLOCO_PENDENTES); }
+    else if (!BLOCO_PENDENTES.isConnected) document.getElementById('compositor').prepend(BLOCO_PENDENTES);
+}
 function redesenha(dados) {
     if (!dados.modelo) { const c = conversaRelevante(); if (c && c.modelo) dados.modelo = c.modelo; }
     ultimosDados = dados;
@@ -4945,7 +4975,9 @@ function desenhaPrincipal(d) {
 
     const principal = document.getElementById('principal');
     principal.querySelectorAll('details[open][data-chave]').forEach(el => { if (!procura) abertos.add(el.dataset.chave); });
+    BLOCO_PENDENTES.remove();
     principal.innerHTML = html;
+    colocaPendentes();
     marcaNovos(principal, d);
     principal.querySelectorAll('details[data-chave]').forEach(el => {
         el.ontoggle = () => {
@@ -6806,10 +6838,22 @@ janelaMapa.addEventListener('click', (ev) => {
 // Ampliar imagem
 const lupa = document.getElementById('lupa');
 function abreLupa(id, url) {
+    lupa.classList.remove('real');
+    lupa.scrollTop = 0;
     lupa.querySelector('img').src = url || '/api/imagem/' + id;
+    lupa.querySelector('.dica-lupa').textContent = 'Clique na imagem para ver no tamanho real';
     lupa.hidden = false;
 }
-lupa.addEventListener('click', () => { lupa.hidden = true; });
+lupa.addEventListener('click', (ev) => {
+    // Clique na imagem: alterna entre caber na tela e o tamanho real (com rolagem); fora dela fecha
+    if (ev.target.tagName === 'IMG') {
+        const real = lupa.classList.toggle('real');
+        lupa.querySelector('.dica-lupa').textContent = real ? 'Role para ver tudo · clique na imagem para caber na tela' : 'Clique na imagem para ver no tamanho real';
+        if (real) { const img = ev.target, r = img.getBoundingClientRect(); lupa.scrollTop = Math.max(0, (ev.clientY - r.top) / r.height * img.naturalHeight - innerHeight / 2); }
+        return;
+    }
+    lupa.hidden = true;
+});
 
 principal.addEventListener('click', (ev) => {
     const resposta = ev.target.closest('[data-responder-proximo]');
@@ -7107,8 +7151,11 @@ function desenhaCompositor() {
     // Só redesenha os cartões quando mudam, para não perder a opção marcada
     const assinatura = JSON.stringify([pendentes.map(p => p.id), alertaContexto && sessaoAtual]);
     if (assinatura !== ultimoPendentes) {
+        const chegouPergunta = pendentes.length && !String(ultimoPendentes || '').includes(String(pendentes[pendentes.length - 1].id));
         ultimoPendentes = assinatura;
-        document.getElementById('pendentes').innerHTML = pendentes.map(cartaoPendente).join('') + (alertaContexto ? `
+        colocaPendentes();
+        if (chegouPergunta) requestAnimationFrame(() => BLOCO_PENDENTES.scrollIntoView({ block: 'nearest', behavior: 'smooth' }));
+        BLOCO_PENDENTES.innerHTML = pendentes.map(cartaoPendente).join('') + (alertaContexto ? `
             <div class="alerta-contexto" role="status">
                 <span><strong>Conversa grande: ${mil(d.contexto)} de contexto.</strong> Para o próximo passo, vale abrir uma conversa nova com o resumo desta. As duas ficam atreladas.</span>
                 <button class="botao principal" data-acao="continuar">Continuar em conversa nova</button>

@@ -4,6 +4,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const COMANDOS = ['alternar', 'proxima', 'anterior'];
+let ultimoErro = '';
 let proc = null, estado = { nada: true }, capa = null, versaoCapa = 0, ultimoUso = 0, timerOcioso = null, falhas = 0, esperaReligar = 0;
 
 function liga() {
@@ -19,6 +20,9 @@ function liga() {
             let o;
             try { o = JSON.parse(linha); } catch (e) { continue; }
             falhas = 0;
+            // Erro novo do script (ex.: serviço de mídia do Windows sem resposta): vai para o servidor.log uma vez
+            if (o.erro && o.erro !== ultimoErro) console.log('player: ' + (o.erro === 'servico' ? 'o serviço de mídia do Windows não respondeu (reiniciar o Windows Explorer costuma resolver)' : o.erro));
+            ultimoErro = o.erro || '';
             // Capa só vem quando a música muda ('' = música sem capa)
             if (typeof o.capa === 'string') { capa = o.capa ? Buffer.from(o.capa, 'base64') : null; versaoCapa++; }
             delete o.capa;

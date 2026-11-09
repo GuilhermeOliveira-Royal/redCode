@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Red Code</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+    /* Tela de abertura (como a do Discord): logo animado e o passo atual da inicializacao */
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; -webkit-app-region: drag; }
+    .cartao { position: absolute; inset: 8px; border-radius: 16px; background: radial-gradient(circle at 50% 38%, #3a1a1a 0, #1d1617 55%, #141011 100%); box-shadow: 0 14px 40px #0009; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; font-family: 'Segoe UI', system-ui, sans-serif; color: #f3e9e8; animation: entra .35s cubic-bezier(.2, .8, .2, 1); }
+    @keyframes entra { from { opacity: 0; transform: scale(.94); } }
+    .logo { width: 92px; height: 92px; color: #e8483d; filter: drop-shadow(0 0 18px #e8483d55); animation: gira 3.2s cubic-bezier(.6, .1, .3, .9) infinite; }
+    @keyframes gira { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(.88); } 100% { transform: rotate(360deg) scale(1); } }
+    .logo line { animation: pulsa 1.6s ease-in-out infinite; }
+    @keyframes pulsa { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+    .passo { font-size: 14px; font-weight: 600; letter-spacing: .01em; min-height: 19px; text-align: center; padding: 0 20px; }
+    .detalhe { margin-top: -14px; font-size: 11.5px; color: #b4a1a2; min-height: 15px; text-align: center; padding: 0 20px; }
+    .barra { width: 170px; height: 4px; border-radius: 3px; background: #ffffff14; overflow: hidden; visibility: hidden; }
+    .barra i { display: block; height: 100%; width: 0; border-radius: 3px; background: #e8483d; transition: width .3s ease; }
+    .versao { position: absolute; bottom: 12px; font-size: 10.5px; color: #7a6668; }
+</style>
+</head>
+<body>
+<div class="cartao">
+    <svg class="logo" viewBox="-1.15 -1.15 2.3 2.3" aria-hidden="true"><g stroke="currentColor" stroke-width="0.2" stroke-linecap="round">
+        <line x1="0" y1="0" x2="0.990" y2="0.139" style="animation-delay:0s"/><line x1="0" y1="0" x2="0.595" y2="0.535" style="animation-delay:.13s"/><line x1="0" y1="0" x2="0.227" y2="0.912" style="animation-delay:.26s"/>
+        <line x1="0" y1="0" x2="-0.103" y2="0.733" style="animation-delay:.39s"/><line x1="0" y1="0" x2="-0.602" y2="0.669" style="animation-delay:.52s"/><line x1="0" y1="0" x2="-0.796" y2="0.198" style="animation-delay:.65s"/>
+        <line x1="0" y1="0" x2="-0.990" y2="-0.139" style="animation-delay:.78s"/><line x1="0" y1="0" x2="-0.572" y2="-0.515" style="animation-delay:.91s"/><line x1="0" y1="0" x2="-0.223" y2="-0.893" style="animation-delay:1.04s"/>
+        <line x1="0" y1="0" x2="0.100" y2="-0.713" style="animation-delay:1.17s"/><line x1="0" y1="0" x2="0.589" y2="-0.654" style="animation-delay:1.3s"/><line x1="0" y1="0" x2="0.815" y2="-0.203" style="animation-delay:1.43s"/>
+    </g><circle r="0.15" fill="currentColor"/></svg>
+    <div class="passo" id="passo">Abrindo&hellip;</div>
+    <div class="detalhe" id="detalhe"></div>
+    <div class="barra" id="barra"><i id="progresso"></i></div>
+    <div class="versao" id="versao"></div>
+</div>
+<script>
+    // O app desktop chama mostra('passo', 'detalhe', progresso 0..1 ou null) a cada etapa (os textos vem de la)
+    function mostra(passo, detalhe, progresso) {
+        document.getElementById('passo').textContent = passo || '';
+        document.getElementById('detalhe').textContent = detalhe || '';
+        const barra = document.getElementById('barra');
+        barra.style.visibility = progresso == null ? 'hidden' : 'visible';
+        if (progresso != null) document.getElementById('progresso').style.width = Math.round(Math.max(0, Math.min(1, progresso)) * 100) + '%';
+    }
+    function versao(texto) { document.getElementById('versao').textContent = texto; }
+</script>
+</body>
+</html>

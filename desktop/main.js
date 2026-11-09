@@ -561,12 +561,44 @@ async function sairComConfirmacao() {
 }
 
 // ---------- Início ----------
+// ---------- Tela de abertura (como a do Discord) ----------
+let splash = null, splashPronta = false;
+// Pelo código, app.getVersion() devolve a do Electron: a do Red Code está no package.json
+const VERSAO_APP = (() => { try { return require(path.join(PASTA, 'package.json')).version; } catch (e) { return app.getVersion(); } })();
+const estadoSplash = { passo: 'Abrindo…', detalhe: '', progresso: null };
+function abreSplash() {
+    splash = new BrowserWindow({
+        width: 300, height: 340, frame: false, transparent: true, resizable: false, maximizable: false, fullscreenable: false,
+        center: true, show: false, title: 'Red Code', icon: icone(256), backgroundColor: '#00000000',
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+    });
+    splash.loadFile(path.join(__dirname, 'splash.html'));
+    splash.once('ready-to-show', () => { if (splash) splash.show(); });
+    splash.webContents.once('did-finish-load', () => { splashPronta = true; aplicaSplash(`versão ${VERSAO_APP}`); });
+    splash.on('closed', () => { splash = null; splashPronta = false; });
+}
+// Guarda o passo atual; se a tela ainda está carregando, ela mostra o último assim que terminar
+function passoSplash(passo, detalhe, progresso) {
+    Object.assign(estadoSplash, { passo, detalhe: detalhe || '', progresso: progresso == null ? null : Number(progresso) });
+    aplicaSplash();
+}
+function aplicaSplash(versao) {
+    if (!splash || splash.isDestroyed() || !splashPronta) return;
+    const e = estadoSplash;
+    const js = `mostra(${JSON.stringify(e.passo)}, ${JSON.stringify(e.detalhe)}, ${e.progresso == null ? 'null' : e.progresso});` + (versao ? `versao(${JSON.stringify(versao)});` : '');
+    splash.webContents.executeJavaScript(js).catch(() => { /* fechando */ });
+}
+function fechaSplash() { if (splash && !splash.isDestroyed()) splash.close(); splash = null; }
+
 app.whenReady().then(async () => {
     if (!primeiraInstancia) return;
     app.setAppUserModelId(AUMID);
     garanteAtalhoMenuIniciar();
     bandeja = new Tray(icone(16));
     bandeja.on('click', mostraJanela);
+    // Aberto pelo Windows (escondido na bandeja) não mostra a tela de abertura
+    if (!INICIA_OCULTO) abreSplash();
+    passoSplash('Iniciando…');
     // Controle do navegador embutido: sobe antes do servidor (que recebe porta e token por env)
     controleNavegador = await navegador.iniciaControle({ icone: icone(256), avisa: () => atualizaBandeja(), proibirPortas: [...new Set([PORTA, 4317])] });
     // Porta já ocupada por um painel? Só abre a janela nele (modo anexar)
@@ -574,6 +606,25 @@ app.whenReady().then(async () => {
     if (existente && existente.ok) viraAnexado();
     else {
         // Rodando pelo código: puxa o que há de novo no GitHub antes de subir o servidor
+        passoSplash('Procurando atualizações…');
+        if (EMPACOTADO && !INICIA_OCULTO) {
+            // Pelo exe: versão nova é baixada e instalada aqui mesmo, e o Red Code reabre já atualizado
+            const info = await atualizacao.releaseNova(app.getVersion()).catch(e => { registraAtualizacao('não deu para conferir as releases: ' + e.message); return null; });
+            if (info) {
+                try {
+                    passoSplash(`Baixando a versão ${info.versao}`, `${Math.round(info.tamanho / 1048576)} MB`, 0);
+                    const novo = await atualizacao.preparaRelease(info, PASTA_DADOS, (p) => passoSplash(`Baixando a versão ${info.versao}`, `${Math.round(p * 100)}% de ${Math.round(info.tamanho / 1048576)} MB`, p), registraAtualizacao);
+                    passoSplash('Instalando…', 'o Red Code abre de novo sozinho', 1);
+                    registraAtualizacao(`versão ${info.versao} instalada na abertura`);
+                    atualizacaoPronta = novo; reabrirAposAtualizar = true;
+                    return app.quit();
+                } catch (e) {
+                    registraAtualizacao('a atualização na abertura falhou: ' + e.message);
+                    passoSplash('Não deu para atualizar agora', 'abrindo a versão atual');
+                    await new Promise(r => setTimeout(r, 1500));
+                }
+            }
+        }
         if (!EMPACOTADO) {
             const r = await atualizacao.pelaFonte(PASTA, registraAtualizacao).catch(e => ({ motivo: e.message }));
             registraAtualizacao(r.atualizou ? `${r.commits} commit(s) novo(s)${r.dependencias ? ', dependências instaladas' : ''}` : r.motivo);
@@ -581,10 +632,15 @@ app.whenReady().then(async () => {
             if (r.atualizou && r.desktopMudou) { app.relaunch(); return app.exit(0); }
             if (r.atualizou) avisoAtualizado = `Red Code atualizado pelo GitHub: ${r.commits} commit(s) novo(s).`;
         }
+        passoSplash(avisoAtualizado ? 'Atualizado' : 'Iniciando o servidor…', avisoAtualizado ? avisoAtualizado.replace(/^Red Code atualizado pelo GitHub: /, '') : '');
         sobeServidor();
-        if (!(await esperaServidor())) { criaJanela(); mostraErro(`O servidor não respondeu na porta ${PORTA}. Veja o log em ${ARQ_LOG}.`); }
+        if (!(await esperaServidor())) { fechaSplash(); criaJanela(); mostraErro(`O servidor não respondeu na porta ${PORTA}. Veja o log em ${ARQ_LOG}.`); }
     }
+    passoSplash('Abrindo…');
     if (!janela) criaJanela();
+    // A janela principal aparece já desenhada; a tela de abertura sai logo depois (sem piscar entre as duas)
+    if (splash) { if (janela.isVisible()) setTimeout(fechaSplash, 250); else janela.once('ready-to-show', () => setTimeout(fechaSplash, 250)); }
+    setTimeout(fechaSplash, 15000);
     atualizaBandeja();
     if (avisoAtualizado && bandeja.displayBalloon) bandeja.displayBalloon({ title: 'Red Code', content: avisoAtualizado });
     // Confere se há versão nova (release pelo exe, commits pelo código) e avisa num cartão no rodapé
