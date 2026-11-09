@@ -534,9 +534,18 @@ async function ramificar(sessionId, cwd, uuid) {
     const sdk = await carregaSdk();
     return sdk.forkSession(sessionId, { dir: cwd, upToMessageId: uuid });
 }
-// Servidores MCP da conversa
+// Servidores MCP da conversa. Num processo que acabou de subir todos ainda estão "pending":
+// espera até 20 s eles saírem desse estado antes de responder (o que ainda não subiu volta como está)
 function statusMcp(sessionId, cwd, env) {
-    return comProcessoDaSessao(sessionId, cwd, (q) => q.mcpServerStatus(), env);
+    return comProcessoDaSessao(sessionId, cwd, async (q) => {
+        const t0 = Date.now();
+        let lista = await q.mcpServerStatus();
+        while (lista.some(s => s.status === 'pending') && Date.now() - t0 < 20000) {
+            await new Promise(r => setTimeout(r, 1000));
+            lista = await q.mcpServerStatus();
+        }
+        return lista;
+    }, env);
 }
 async function acaoMcp(sessionId, servidor, acao) {
     const viva = vivaNaSessao(sessionId);

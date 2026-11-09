@@ -449,6 +449,101 @@ html[data-tema-efetivo="claro"] { --pet-acessorio: #1b1b1b; }
 .pet-planejador .pet-extra::before, .pet-planejador .pet-extra::after { top: -8px; width: 2px; height: 9px; background: var(--pet-acessorio); }
 .pet-planejador .pet-extra::before { left: 11px; transform: rotate(-20deg); }
 .pet-planejador .pet-extra::after { right: 11px; transform: rotate(20deg); }
+/* ---------- Mascote montado por partes (pet-v): forma, olhos, boca, bochechas, chapéu, óculos, jeito ---------- */
+.pet-v .pet-cara, .pet-v .pet-rosto { position: absolute; inset: 0; pointer-events: none; }
+.pet-v .pet-cara::before, .pet-v .pet-cara::after, .pet-v .pet-rosto::before, .pet-v .pet-rosto::after { content: ""; position: absolute; }
+/* Formas */
+.pet-v.forma-quadrado .pet-corpo { border-radius: 8px; }
+.pet-v.forma-redondo .pet-corpo { width: 30px; height: 30px; border-radius: 50%; }
+.pet-v.forma-largo .pet-corpo { width: 40px; height: 24px; border-radius: 12px 12px 8px 8px; }
+.pet-v.forma-alto .pet-corpo { width: 28px; height: 34px; border-radius: 14px 14px 9px 9px; }
+.pet-v.forma-pera .pet-corpo { width: 32px; height: 30px; border-radius: 50% 50% 46% 46% / 62% 62% 38% 38%; }
+.pet-v.forma-alto .pet-corpo::before, .pet-v.forma-alto .pet-corpo::after { top: 11px; }
+/* Olhos */
+@keyframes petPiscaG { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.15); } }
+.pet-v.olhos-normal .pet-corpo::before, .pet-v.olhos-normal .pet-corpo::after { animation: petPiscaG 3.2s infinite; }
+.pet-v.olhos-grandes .pet-corpo::before, .pet-v.olhos-grandes .pet-corpo::after { width: 7px; height: 9px; top: 7px; border-radius: 4px; background: radial-gradient(circle at 35% 30%, #fff 0 1.3px, #1b1b1b 1.7px); animation: petPiscaG 3.2s infinite; }
+.pet-v.olhos-brilho .pet-corpo::before, .pet-v.olhos-brilho .pet-corpo::after { width: 6px; height: 6px; top: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff 0 1.2px, #1b1b1b 1.6px); animation: petPiscaG 3.2s infinite; }
+.pet-v.olhos-felizes .pet-corpo::before, .pet-v.olhos-felizes .pet-corpo::after { width: 7px; height: 4px; top: 10px; background: none; border: 2px solid #1b1b1b; border-bottom: 0; border-radius: 7px 7px 0 0; animation: none; }
+.pet-v.olhos-sono .pet-corpo::before, .pet-v.olhos-sono .pet-corpo::after { width: 6px; height: 2px; top: 12px; border-radius: 2px; animation: none; }
+.pet-v.olhos-bravo .pet-corpo::before, .pet-v.olhos-bravo .pet-corpo::after { width: 6px; height: 4px; top: 10px; border-radius: 1px 1px 3px 3px; animation: none; }
+.pet-v.olhos-bravo .pet-corpo::before { transform: rotate(18deg); }
+.pet-v.olhos-bravo .pet-corpo::after { transform: rotate(-18deg); }
+/* Boca e bochechas */
+.pet-v .pet-rosto::before { left: 50%; top: 64%; }
+.pet-v.boca-sorriso .pet-rosto::before { width: 8px; height: 4px; margin-left: -4px; border: 2px solid #1b1b1b; border-top: 0; border-radius: 0 0 8px 8px; box-sizing: border-box; height: 5px; }
+.pet-v.boca-aberta .pet-rosto::before { width: 6px; height: 5px; margin-left: -3px; border-radius: 50%; background: #1b1b1b; }
+.pet-v.boca-lingua .pet-rosto::before { width: 8px; height: 5px; margin-left: -4px; border-radius: 0 0 8px 8px; background: linear-gradient(#1b1b1b 45%, #ff6b8b 45%); }
+.pet-v.boca-gato .pet-rosto::before { width: 10px; height: 4px; margin-left: -5px; background: radial-gradient(circle at 25% 0, transparent 2.2px, #1b1b1b 2.4px 3.6px, transparent 3.8px), radial-gradient(circle at 75% 0, transparent 2.2px, #1b1b1b 2.4px 3.6px, transparent 3.8px); }
+.pet-v.com-bochechas .pet-rosto::after { left: 3px; right: 3px; top: 56%; height: 4px; background: radial-gradient(circle at 3px 50%, #ff8fa8b0 2.6px, transparent 3px), radial-gradient(circle at calc(100% - 3px) 50%, #ff8fa8b0 2.6px, transparent 3px); }
+/* Chapéus (na pet-extra) */
+.pet-v.chapeu-orelhas .pet-extra::before, .pet-v.chapeu-orelhas .pet-extra::after { top: -6px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid var(--cor-pet); }
+.pet-v.chapeu-orelhas .pet-extra::before { left: 2px; transform: rotate(-12deg); }
+.pet-v.chapeu-orelhas .pet-extra::after { right: 2px; transform: rotate(12deg); }
+.pet-v.chapeu-chifres .pet-extra::before, .pet-v.chapeu-chifres .pet-extra::after { top: -8px; width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent; border-bottom: 10px solid #f2e6cf; }
+.pet-v.chapeu-chifres .pet-extra::before { left: 5px; transform: rotate(-22deg); }
+.pet-v.chapeu-chifres .pet-extra::after { right: 5px; transform: rotate(22deg); }
+.pet-v.chapeu-antena .pet-extra::before { left: 50%; top: -9px; width: 2px; height: 9px; margin-left: -1px; background: var(--pet-acessorio); }
+.pet-v.chapeu-antena .pet-extra::after { left: 50%; top: -14px; width: 7px; height: 7px; margin-left: -3.5px; border-radius: 50%; background: #e6ff9a; box-shadow: 0 0 6px #e6ff9a; animation: petCursor .7s steps(2) infinite; }
+.pet-v.chapeu-antenas .pet-extra::before, .pet-v.chapeu-antenas .pet-extra::after { top: -8px; width: 2px; height: 9px; background: var(--pet-acessorio); }
+.pet-v.chapeu-antenas .pet-extra::before { left: 30%; transform: rotate(-20deg); }
+.pet-v.chapeu-antenas .pet-extra::after { right: 30%; transform: rotate(20deg); }
+.pet-v.chapeu-formatura .pet-extra::before { left: 50%; top: -6px; width: 28px; height: 5px; margin-left: -14px; background: var(--pet-acessorio); border-radius: 1px; transform: rotate(-4deg); }
+.pet-v.chapeu-formatura .pet-extra::after { left: 50%; top: -10px; width: 10px; height: 5px; margin-left: -5px; background: var(--pet-acessorio); border-radius: 2px 2px 0 0; }
+.pet-v.chapeu-boina .pet-extra::before { left: 50%; top: -5px; width: 22px; height: 8px; margin-left: -11px; border-radius: 50%; background: var(--pet-acessorio); transform: rotate(-10deg); }
+.pet-v.chapeu-boina .pet-extra::after { left: 50%; top: -8px; width: 3px; height: 4px; margin-left: -1.5px; background: var(--pet-acessorio); border-radius: 2px; }
+.pet-v.chapeu-parabolica .pet-extra::before { left: 4px; top: -9px; width: 14px; height: 8px; border: 2px solid var(--pet-acessorio); border-bottom: 0; border-radius: 14px 14px 0 0; transform: rotate(-25deg); }
+.pet-v.chapeu-parabolica .pet-extra::after { left: 10px; top: -3px; width: 2px; height: 5px; background: var(--pet-acessorio); }
+.pet-v.chapeu-coroa .pet-extra::before { left: 50%; top: -9px; width: 18px; height: 9px; margin-left: -9px; background: #f5c542; clip-path: polygon(0 100%, 0 25%, 25% 65%, 50% 0, 75% 65%, 100% 25%, 100% 100%); }
+.pet-v.chapeu-cartola .pet-extra::before { left: 50%; top: -3px; width: 26px; height: 3px; margin-left: -13px; background: var(--pet-acessorio); border-radius: 2px; }
+.pet-v.chapeu-cartola .pet-extra::after { left: 50%; top: -14px; width: 16px; height: 12px; margin-left: -8px; background: var(--pet-acessorio); border-radius: 2px 2px 0 0; box-shadow: inset 0 -3px 0 #e8483d; }
+.pet-v.chapeu-laco .pet-extra::before, .pet-v.chapeu-laco .pet-extra::after { top: -6px; width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
+.pet-v.chapeu-laco .pet-extra::before { right: 50%; margin-right: -1px; border-right: 9px solid #ff6ac1; }
+.pet-v.chapeu-laco .pet-extra::after { left: 50%; margin-left: -1px; border-left: 9px solid #ff6ac1; }
+.pet-v.chapeu-folha .pet-extra::before { left: 50%; top: -9px; width: 10px; height: 8px; margin-left: -2px; background: #7bd88f; border-radius: 0 100% 0 100%; transform: rotate(-20deg); }
+.pet-v.chapeu-folha .pet-extra::after { left: 50%; top: -4px; width: 2px; height: 5px; margin-left: -1px; background: #5a9e60; }
+/* Óculos (na pet-cara) */
+.pet-v.cara-oculos .pet-cara::before, .pet-v.cara-oculos .pet-cara::after { top: 6px; width: 11px; height: 11px; border: 2px solid #1b1b1b; border-radius: 50%; box-sizing: border-box; }
+.pet-v.cara-oculos .pet-cara::before { left: 5px; }
+.pet-v.cara-oculos .pet-cara::after { right: 5px; }
+.pet-v.cara-escuros .pet-cara::before, .pet-v.cara-escuros .pet-cara::after { top: 8px; width: 11px; height: 7px; background: #1b1b1b; border-radius: 2px 2px 5px 5px; box-shadow: inset 2px 1px 0 #ffffff40; }
+.pet-v.cara-escuros .pet-cara::before { left: 5px; }
+.pet-v.cara-escuros .pet-cara::after { right: 5px; }
+.pet-v.cara-monoculo .pet-cara::after { right: 5px; top: 6px; width: 11px; height: 11px; border: 2px solid #e0af68; border-radius: 50%; box-sizing: border-box; }
+.pet-v.cara-monoculo .pet-cara::before { right: 6px; top: 16px; width: 1px; height: 9px; background: #e0af68; }
+.pet-v.forma-alto.cara-oculos .pet-cara::before, .pet-v.forma-alto.cara-oculos .pet-cara::after, .pet-v.forma-alto.cara-escuros .pet-cara::before, .pet-v.forma-alto.cara-escuros .pet-cara::after { top: 8px; }
+/* Jeito de se mexer (pet grande sempre; mini só rodando) */
+@keyframes petFlutua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+.pet.pet-v.jeito-balanca .pet-corpo { animation-name: petBalanco; animation-duration: 1.6s; }
+.pet.pet-v.jeito-acena .pet-corpo { animation-name: petAcena; animation-duration: 1.4s; }
+.pet.pet-v.jeito-flutua .pet-corpo { animation-name: petFlutua; animation-duration: 2.4s; }
+.pet.pet-v.jeito-parado .pet-corpo { animation-name: none; }
+.pet-mini.rodando.jeito-balanca .pet-corpo { animation-name: petBalanco; }
+.pet-mini.rodando.jeito-acena .pet-corpo { animation-name: petAcena; }
+.pet-mini.rodando.jeito-flutua .pet-corpo { animation-name: petFlutua; }
+.pet-mini.rodando.jeito-parado .pet-corpo { animation-name: none; }
+/* Editor de mascote */
+.ajuda .caixa.janela-pet { width: min(860px, 96vw); max-height: 90vh; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
+.pet-editor { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 18px; }
+.pet-vitrine { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px 12px; border: 1px solid var(--linha); border-radius: 14px; background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--cor-previa, #7aa2f7) 22%, transparent), transparent 70%), var(--folha); align-self: start; }
+.pet-previa { height: 190px; display: flex; align-items: flex-end; justify-content: center; }
+.pet-previa .pet { zoom: 2.4; width: 74px; }
+.pet-previa .pet-nome, .pet-previa .pet-faz { display: none; }
+.pet-quem { width: 100%; height: 32px; padding: 0 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--papel); color: var(--tinta); font: 600 13px var(--sans); }
+.pet-vitrine-botoes { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.pet-opcoes { overflow: auto; padding-right: 4px; display: flex; flex-direction: column; gap: 12px; }
+.pet-parte h4 { margin: 0 0 6px; font: 600 12px var(--sans); color: var(--grafite); text-transform: uppercase; letter-spacing: .05em; }
+.pet-grade { display: flex; flex-wrap: wrap; gap: 6px; }
+.pet-opcao { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: 66px; height: 66px; padding: 4px 2px 5px; border: 1px solid var(--linha); border-radius: 10px; background: var(--folha); color: var(--grafite); font-size: 10.5px; transition: border-color .15s, transform .15s, background .15s; }
+.pet-opcao:hover { border-color: color-mix(in srgb, var(--tinta) 30%, var(--linha)); transform: translateY(-1px); }
+.pet-opcao.escolhida { border-color: var(--voce); background: color-mix(in srgb, var(--voce) 10%, var(--folha)); color: var(--tinta); box-shadow: 0 0 0 1px var(--voce); }
+.pet-opcao .pet-mini { zoom: .85; }
+.pet-opcao .ic-item { height: 30px; display: grid; place-items: center; color: var(--tinta); }
+.pet-cor { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; box-shadow: inset 0 0 0 1px #0003; }
+.pet-cor.escolhida { border-color: var(--tinta); box-shadow: 0 0 0 2px var(--folha) inset; }
+.pet-cor-livre { width: 34px; height: 30px; padding: 0; border: 1px solid var(--linha); border-radius: 8px; background: none; cursor: pointer; }
+.pet-rodape { display: flex; justify-content: flex-end; gap: 8px; }
+@media (max-width: 720px) { .pet-editor { grid-template-columns: 1fr; } }
 /* web-fetch: antena parabólica */
 .pet-leitor .pet-extra::before { left: 4px; top: -9px; width: 14px; height: 8px; border: 2px solid var(--pet-acessorio); border-bottom: 0; border-radius: 14px 14px 0 0; transform: rotate(-25deg); }
 .pet-leitor .pet-extra::after { left: 10px; top: -3px; width: 2px; height: 5px; background: var(--pet-acessorio); }
@@ -739,7 +834,20 @@ button.grafo-linha:hover { background: var(--folha); }
 /* Grafo desenhado */
 .grafo-vis { position: relative; }
 .grafo-svg { position: absolute; left: 0; top: 0; pointer-events: none; }
-.grafo-linhas { padding-left: var(--grafo-larg); }
+.grafo-fila, .grafo-exp { position: relative; padding-left: var(--grafo-larg); }
+.grafo-exp { overflow: hidden; }
+.grafo-item.aberto > .grafo-fila .grafo-linha { background: var(--folha); }
+.grafo-arqs { display: flex; flex-direction: column; padding: 2px 0 6px; animation: grafoAbre .18s ease-out; }
+@keyframes grafoAbre { from { opacity: 0; transform: translateY(-4px); } }
+.grafo-arq { display: flex; align-items: center; gap: 7px; height: 24px; padding: 0 6px 0 14px; border-radius: 5px; font-size: 12.5px; color: var(--tinta); text-align: left; }
+.grafo-arq:hover { background: var(--realce); }
+.grafo-arq .git-ic-img, .grafo-arq .git-ic { flex: none; }
+.grafo-arq-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grafo-arq-nome small { color: var(--grafite); font-size: 11px; margin-left: 4px; }
+.grafo-arq .git-letra { flex: none; }
+.grafo-arq-detalhes { align-self: flex-start; margin: 4px 0 0 14px; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; color: var(--grafite); }
+.grafo-arq-detalhes:hover { color: var(--tinta); background: var(--realce); }
+.grafo-arqs-nota { margin: 4px 0 4px 14px; font-size: 12px; }
 .grafo-vis .grafo-linha { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 6px; border-radius: 6px; font-size: 12.5px; overflow: hidden; }
 .grafo-vis .grafo-linha:hover { background: var(--folha); }
 .grafo-vis .grafo-assunto { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--tinta); }
@@ -846,6 +954,9 @@ button.grafo-linha:hover { background: var(--folha); }
 .msg .texto { white-space: pre-wrap; line-height: 1.55; }
 .msg .rodape-msg { display: flex; align-items: center; min-height: 22px; font: 11px var(--mono); color: var(--grafite); margin-top: 3px; padding: 0 6px; }
 .msg.voce { align-items: flex-end; }
+/* Sua mensagem: horário na ponta direita (embaixo do balão); as ações aparecem à esquerda dele no hover */
+.msg.voce .rodape-msg { flex-direction: row-reverse; }
+.msg.voce .acoes-msg { margin: 0 10px 0 0; }
 .msg.voce .balao { background: var(--voce-fundo); border: 1px solid color-mix(in srgb, var(--voce) 35%, transparent); border-bottom-right-radius: 4px; }
 .msg.voce .texto { font-weight: 500; }
 .msg.voce.anexo { margin-top: -8px; }
@@ -1468,13 +1579,14 @@ body.sessao-chat #btnTerminal, body.sessao-chat .seletor-modo, body.sessao-chat 
 .chip-perfil { position: fixed; bottom: 10px; left: calc(var(--larg-sessoes) - 10px); transform: translateX(-100%); z-index: 41; box-sizing: border-box; height: 31px; display: inline-flex; align-items: center; gap: 6px; max-width: 120px; padding: 0 10px 0 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); border: 1px solid var(--linha); border-radius: 999px; background: var(--folha); color: var(--tinta); font-size: 12px; transition: background-color .15s, border-color .15s; }
 .chip-perfil:empty, body.lista-escondida .chip-perfil { display: none; }
 /* Pílula de uso e perfil no rodapé da lista: mesma altura e mesma base */
-.uso-plano.minimizado .uso-pilula { box-sizing: border-box; height: 30px; white-space: nowrap; }
+.uso-plano.minimizado .uso-pilula { box-sizing: border-box; height: 30px; white-space: nowrap; max-width: 100%; }
+.uso-plano.minimizado .uso-texto { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Telas estreitas: a pílula minimizada continua presa no rodapé (senão ocupa a largura toda e fica sob o seletor de perfil) */
 @media (max-width: 1100px) { .uso-plano.minimizado { position: fixed; margin: 0; width: auto; bottom: 10px; left: 10px; } }
 .chip-perfil:hover { background: var(--realce); }
 /* Rodapé da lista: a lista termina acima dele (a barra de rolagem não passa por baixo das pílulas) */
 .lista { padding-bottom: 12px; }
-.rodape-sessoes { flex: none; border-top: 1px solid var(--linha); padding: 8px 10px 0; }
+.rodape-sessoes { flex: none; margin-top: auto; border-top: 1px solid var(--linha); padding: 8px 10px 0; }
 .rodape-pilulas { height: 49px; }
 body.lista-escondida .rodape-sessoes { display: none; }
 /* Player do que está tocando no Windows */
@@ -1489,6 +1601,10 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .player-midia .pm-btn:hover { background: var(--realce); }
 .player-midia .pm-btn:active { transform: scale(.9); }
 .player-midia .pm-btn:disabled { opacity: .35; pointer-events: none; }
+.player-midia .pm-rola { display: inline; }
+.player-midia .rolando { text-overflow: clip; mask-image: linear-gradient(90deg, #000 calc(100% - 12px), transparent); }
+.player-midia .rolando .pm-rola { display: inline-block; animation: pmRola var(--tempo, 4s) ease-in-out infinite alternate; }
+@keyframes pmRola { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--desloca, 0)); } }
 .player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--voce); transition: width 1s linear; }
 .player-midia.pausado .pm-prog { opacity: .45; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
@@ -1622,8 +1738,8 @@ html[data-movimento="reduzido"] #evCodigo.ev-abrindo { animation: none; }
 body.layout-editor .layout,
 body.layout-editor.lateral-aberta .layout { grid-template-columns: var(--larg-sessoes) minmax(0, 1fr) var(--larg-conversa); }
 body.layout-editor .editor-vivo { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100vh; background: #120e0f; border-right: 1px solid var(--linha); }
-/* Painel de agentes/Git: por cima do editor (mesmo botão ▥ de sempre); clicar fora fecha */
-body.layout-editor.lateral-aberta .lateral { position: fixed; right: 0; top: 0; bottom: 0; width: var(--larg-lateral); z-index: 35; overflow: auto; background: var(--folha); box-shadow: -12px 0 30px #000a; }
+/* Painel de agentes/Git: por cima do editor, encostado no chat (a conversa continua à vista); mesmo botão ▥; clicar fora fecha */
+body.layout-editor.lateral-aberta .lateral { position: fixed; right: var(--larg-conversa); top: 0; bottom: 0; width: min(var(--larg-lateral), calc(100vw - var(--larg-sessoes) - var(--larg-conversa))); z-index: 35; overflow: auto; background: var(--folha); border-left: 1px solid var(--linha); border-right: 1px solid var(--linha); box-shadow: -12px 0 30px #0006; }
 body.layout-editor .botoes-cantos { z-index: 40; }
 body.layout-editor.ver-detalhes .topo-sessao .destaques { grid-template-columns: 1fr; }
 body.layout-editor .titulo { font-size: 19px; }
@@ -1708,6 +1824,20 @@ html[data-tema-efetivo="claro"] {
     --cmd: #5a5266; --leitura: #7a6d6e; --edicao: #d4372c; --outro: #8a7d7e; --sombra: 0 8px 24px rgba(0, 0, 0, .10);
 }
 html[data-tema-efetivo="claro"] pre.diff, html[data-tema-efetivo="claro"] .texto-editado { background: var(--codigo); }
+/* ---------- Tema personalizado (Configurações › Geral › Cores) ---------- */
+html[data-cor-principal][data-cor-principal] { --voce: var(--c-principal); --voce-fundo: color-mix(in srgb, var(--c-principal) 22%, var(--papel)); --edicao: var(--c-principal); --vermelho: var(--c-principal); }
+html[data-cor-secundaria][data-cor-secundaria] { --modelo: var(--c-secundaria); --modelo-fundo: color-mix(in srgb, var(--c-secundaria) 13%, var(--papel)); --cmd: var(--c-secundaria); }
+html[data-cor-fundo][data-cor-fundo] { --papel: color-mix(in srgb, var(--c-fundo) 9%, #0f0f11); --folha: color-mix(in srgb, var(--c-fundo) 11%, #17171a); --realce: color-mix(in srgb, var(--c-fundo) 15%, #1f1f23); --linha: color-mix(in srgb, var(--c-fundo) 28%, #2c2c31); --marca: color-mix(in srgb, var(--c-fundo) 28%, #2c2c31); }
+html[data-cor-fundo][data-cor-fundo][data-tema-efetivo="claro"] { --papel: color-mix(in srgb, var(--c-fundo) 5%, #f7f7f8); --folha: color-mix(in srgb, var(--c-fundo) 2%, #ffffff); --realce: color-mix(in srgb, var(--c-fundo) 9%, #efeff1); --linha: color-mix(in srgb, var(--c-fundo) 18%, #dcdce0); --marca: color-mix(in srgb, var(--c-fundo) 18%, #dcdce0); --codigo: color-mix(in srgb, var(--c-fundo) 5%, #f1f1f3); }
+.cores-tema { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+.paletas-tema { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; max-width: 420px; }
+.paleta-tema { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 5px; border: 1px solid var(--linha); border-radius: 14px; background: var(--folha); color: var(--tinta); font-size: 12px; }
+.paleta-tema:hover { border-color: color-mix(in srgb, var(--tinta) 30%, var(--linha)); }
+.paleta-tema.escolhida { border-color: var(--voce); box-shadow: 0 0 0 1px var(--voce); }
+.paleta-bola { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px #0003; }
+.seletores-tema { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.cor-tema { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--grafite); }
+.cor-tema input { width: 32px; height: 26px; padding: 0; border: 1px solid var(--linha); border-radius: 7px; background: none; cursor: pointer; }
 html[data-tema-efetivo="claro"] .uso-plano { box-shadow: 0 10px 30px rgba(0, 0, 0, .12); }
 /* Editor ao vivo no tema claro: as cores do Light+ do VS Code */
 html[data-tema-efetivo="claro"] body.layout-editor .editor-vivo, html[data-tema-efetivo="claro"] .ev-aba.ativa, html[data-tema-efetivo="claro"] .ev-codigo { background: #ffffff; }
@@ -1815,6 +1945,11 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         r.dataset.fonteUi = g('fonteUi', 'padrao');
         r.dataset.fonteResposta = g('fonteResposta', 'interface');
         r.dataset.tamTexto = g('tamTexto', 'medio');
+        // Cores próprias (Configurações › Geral › Cores): principal, secundária e tom do fundo
+        [['corPrincipal', 'principal'], ['corSecundaria', 'secundaria'], ['corFundo', 'fundo']].forEach(function (c) {
+            var v = g(c[0], '');
+            if (/^#[0-9a-f]{6}$/i.test(v)) { r.style.setProperty('--c-' + c[1], v); r.setAttribute('data-cor-' + c[1], ''); }
+        });
     } catch (e) { /* sem armazenamento: fica o padrão */ }
 })();
 </script>
@@ -1951,6 +2086,20 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 <div class="alca-coluna" data-alca="lateral" title="Arraste para mudar a largura do painel (duplo clique volta ao padrão)" hidden></div>
 <div class="alca-coluna" data-alca="conversa" title="Arraste para mudar a largura da conversa (duplo clique volta ao padrão)" hidden></div>
 <div class="recado" id="recado" role="status" aria-live="polite"></div>
+<div class="ajuda" id="janelaPet" hidden>
+    <div class="caixa janela-pet" role="dialog" aria-modal="true" aria-labelledby="tituloPet">
+        <div class="cabeca-mapa"><h2 id="tituloPet">Personalizar mascote</h2><button class="fechar-mapa" data-fechar-pet aria-label="Fechar">×</button></div>
+        <div class="pet-editor">
+            <div class="pet-vitrine" id="petVitrine">
+                <div class="pet-previa" id="petPrevia"></div>
+                <select class="pet-quem" id="petQuem" aria-label="Qual mascote"></select>
+                <div class="pet-vitrine-botoes"><button type="button" class="mini" data-pet-aleatorio>🎲 Aleatório</button><button type="button" class="mini" data-pet-padrao>Restaurar padrão</button></div>
+            </div>
+            <div class="pet-opcoes" id="petOpcoes"></div>
+        </div>
+        <div class="pet-rodape"><button type="button" class="mini" data-fechar-pet>Cancelar</button><button type="button" class="botao principal" data-pet-salvar>Salvar</button></div>
+    </div>
+</div>
 <div class="ajuda" id="janelaMcp" hidden>
     <div class="caixa janela-mcp" role="dialog" aria-modal="true" aria-labelledby="tituloMcp">
         <div class="cabeca-mapa"><h2 id="tituloMcp">Servidores MCP</h2><button class="fechar-mapa" data-fechar-mcp aria-label="Fechar">×</button></div>
@@ -2395,7 +2544,7 @@ let midiaAtual = null, capaMostrada = -1, semMidiaDesde = 0;
 const nomeAppMidia = (id) => { const n = String(id || '').split(/[.!_]/)[0]; return n ? n[0].toUpperCase() + n.slice(1) : ''; };
 function montaPlayer() {
     playerMidia.innerHTML = `<span class="pm-capa sem">${ICONE_MIDIA.nota}</span>
-        <div class="pm-textos"><div class="pm-titulo"></div><div class="pm-artista"></div></div>
+        <div class="pm-textos"><div class="pm-titulo"><span class="pm-rola"></span></div><div class="pm-artista"><span class="pm-rola"></span></div></div>
         <button type="button" class="pm-btn" data-midia="alternar"></button>
         <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
         <span class="pm-prog"></span>`;
@@ -2412,9 +2561,10 @@ function desenhaMidia() {
     if (!playerMidia.firstChild) montaPlayer();
     const tocando = m.estado === 'Playing';
     const artista = [m.artista, m.album].filter(Boolean).join(' · ');
-    playerMidia.querySelector('.pm-titulo').textContent = m.titulo;
-    playerMidia.querySelector('.pm-artista').textContent = artista;
-    playerMidia.querySelector('.pm-textos').title = m.titulo + (m.artista ? ' — ' + m.artista : '') + (nomeAppMidia(m.app) ? '\nTocando no ' + nomeAppMidia(m.app) : '');
+    const trocouTexto = playerMidia.querySelector('.pm-titulo .pm-rola').textContent !== m.titulo || playerMidia.querySelector('.pm-artista .pm-rola').textContent !== artista;
+    playerMidia.querySelector('.pm-titulo .pm-rola').textContent = m.titulo;
+    playerMidia.querySelector('.pm-artista .pm-rola').textContent = artista;
+    if (trocouTexto && playerMidia.matches(':hover')) rolaTextosPlayer(true);
     // Capa: só troca a imagem quando a música muda
     if (m.capa !== capaMostrada) {
         capaMostrada = m.capa;
@@ -2443,6 +2593,22 @@ function andaProgresso() {
     barra.hidden = false;
     barra.style.width = Math.min(100, Math.max(0, pos / m.duracao * 100)).toFixed(2) + '%';
 }
+// Mouse em cima: o título da música, se não cabe, desliza até o fim, pausa e volta (o tempo cresce com o tamanho)
+function rolaTextosPlayer(ligar) {
+    for (const linha of playerMidia.querySelectorAll('.pm-titulo')) {
+        const texto = linha.querySelector('.pm-rola');
+        linha.classList.remove('rolando');
+        if (!texto || !ligar) continue;
+        const sobra = linha.scrollWidth - linha.clientWidth;
+        if (sobra <= 2) continue;
+        texto.style.setProperty('--desloca', -(sobra + 2) + 'px');
+        texto.style.setProperty('--tempo', Math.max(2.4, (sobra + 2) / 28 + 1.6).toFixed(1) + 's');
+        void linha.offsetWidth;   // recomeça a animação do início
+        linha.classList.add('rolando');
+    }
+}
+playerMidia.addEventListener('mouseenter', () => rolaTextosPlayer(true));
+playerMidia.addEventListener('mouseleave', () => rolaTextosPlayer(false));
 async function atualizaMidia() {
     if (document.hidden || JANELA_SECUNDARIA) return;
     let m;
@@ -2508,9 +2674,13 @@ function desenhaUso() {
         // Resumo: sessão e o semanal geral (o maior uso decide a cor)
         const curto = u.limites.filter(l => l.grupo === 'session' || /todos/.test(l.nome)).map(l => ({ nome: l.grupo === 'session' ? 'Sessão' : 'Semanal', p: l.percentual }));
         const maior = Math.max(...u.limites.map(l => l.percentual));
-        el.innerHTML = `<button class="uso-pilula ${maior >= 90 ? 'critico' : maior >= 70 ? 'alto' : ''}" data-uso-expandir title="Mostrar os limites de uso do plano" aria-label="Mostrar os limites de uso do plano">
-            <span class="ponto-uso" aria-hidden="true"></span>${curto.map(c => `${c.nome} <b>${c.p}%</b>`).join(' · ')}</button>`;
+        // Sem espaço para os dois (ex.: plano por sessão com o seletor de perfil ao lado): fica só o maior
+        const doMaior = curto.reduce((a, c) => (c.p > a.p ? c : a), curto[0] || { nome: 'Uso', p: maior });
+        const texto = (lista) => lista.map(c => `${c.nome} <b>${c.p}%</b>`).join(' · ');
+        el.innerHTML = `<button class="uso-pilula ${maior >= 90 ? 'critico' : maior >= 70 ? 'alto' : ''}" data-uso-expandir title="${esc(curto.map(c => c.nome + ': ' + c.p + '%').join(' · '))} · clique para ver os limites" aria-label="Mostrar os limites de uso do plano">
+            <span class="ponto-uso" aria-hidden="true"></span><span class="uso-texto" data-completo="${esc(texto(curto))}" data-curto="${esc(texto([doMaior]))}">${texto(curto)}</span></button>`;
         el.hidden = false;
+        ajustaPilulaUso();
         return;
     }
     {
@@ -2937,8 +3107,15 @@ document.getElementById('painelGit').addEventListener('click', async (ev) => {
         if (st.dataset.gitStash === 'stash-apagar' && !(await confirmaNaPagina('Apagar este stash?', '<p>As alterações guardadas nele se perdem.</p>', 'Apagar'))) return;
         return acaoGit({ acao: st.dataset.gitStash, indice: Number(st.dataset.indice), hash: st.dataset.hash }, 'Feito', cwd);
     }
+    const det = ev.target.closest('[data-git-commit-detalhes]');
+    if (det) return mostraCommitGit(det.dataset.gitCommitDetalhes);
+    const arqGrafo = ev.target.closest('.grafo-arq[data-git-arq-commit]');
+    if (arqGrafo) {
+        const r = await getPainel(`/api/git/commit?cwd=${encodeURIComponent(pastaDoGit())}&hash=${arqGrafo.dataset.hash}&arquivo=${encodeURIComponent(arqGrafo.dataset.gitArqCommit)}`).catch(e => ({ diff: e.message }));
+        return abreJanelaGit(arqGrafo.dataset.gitArqCommit, `<button type="button" class="mini cm-voltar" data-voltar-commit="${esc(arqGrafo.dataset.hash)}">‹ Voltar ao commit</button>` + diffUnificado(r.diff || '(sem diferenças)'));
+    }
     const cm = ev.target.closest('[data-git-commit]');
-    if (cm) return mostraCommitGit(cm.dataset.gitCommit);
+    if (cm) return alternaCommitGrafo(cm.dataset.gitCommit, cm);
 });
 document.getElementById('gitSecaoGrafo').addEventListener('toggle', (ev) => { if (ev.target.open) carregaGrafo(); });
 async function fazCommit() {
@@ -3111,13 +3288,15 @@ function dicaCommit(c, iniciais, refs, corFaixa) {
 function desenhaGrafo(commits) {
     const x = (i) => GRAFO_X0 + i * GRAFO_DX, cor = (i) => CORES_GRAFO[i % CORES_GRAFO.length];
     let faixas = [];   // hash esperado em cada faixa (null = livre)
-    const svg = [], linhasHtml = [];
+    let svg = [];
+    const linhasHtml = [], linhasSvg = [], continuacoes = [];
     let largura = 1;
     // Servidor antigo (antes de reiniciar) não manda os pais: desenha em linha reta, sem quebrar
     const semPais = commits.some(c => !Array.isArray(c.pais));
     commits = commits.map((c, i) => Array.isArray(c.pais) ? c : { ...c, pais: commits[i + 1] ? [commits[i + 1].hash] : [], refs: c.refs || [] });
     commits.forEach((c, r) => {
-        const yT = r * GRAFO_ALT, yC = yT + GRAFO_ALT / 2, yB = yT + GRAFO_ALT;
+        svg = [];
+        const yT = 0, yC = GRAFO_ALT / 2, yB = GRAFO_ALT;
         let col = faixas.indexOf(c.hash);
         const esperado = col >= 0;
         if (!esperado) { col = faixas.indexOf(null); if (col < 0) col = faixas.length; faixas[col] = c.hash; }
@@ -3140,6 +3319,8 @@ function desenhaGrafo(commits) {
         destinos.forEach(j => svg.push(j === col ? `<path d="M${x(col)} ${yC}V${yB}" stroke="${cor(col)}"/>` : `<path d="M${x(col)} ${yC}C${x(col)} ${yB},${x(j)} ${yC},${x(j)} ${yB}" stroke="${cor(j)}"/>`));
         while (faixas.length && faixas[faixas.length - 1] === null) faixas.pop();
         largura = Math.max(largura, antes.length, faixas.length, col + 1);
+        // Faixas que seguem para o commit de baixo: atravessam a lista de arquivos quando ele está aberto
+        continuacoes.push(faixas.map((f, i) => (f ? i : -1)).filter(i => i >= 0));
         const head = c.refs.some(rf => /^HEAD/.test(rf));
         svg.push(`<circle cx="${x(col)}" cy="${yC}" r="${head ? 5.5 : 4}" fill="${head ? 'var(--papel)' : cor(col)}" stroke="${cor(col)}" stroke-width="${head ? 2.5 : 0}"/>`);
         // No máximo 2 etiquetas por commit (+N com a lista no tooltip); origin/HEAD é ruído
@@ -3153,10 +3334,14 @@ function desenhaGrafo(commits) {
             return `<span class="grafo-ref ${t}" style="--cor-ref:${cor(col)}" title="${esc(rf)}${tambemRemota ? ' (igual ao origin/' + esc(nomeRef) + ')' : ''}">${esc(nomeRef)}${tambemRemota ? ' ⇅' : ''}</span>`;
         }).join('') + (todasRefs.length > 2 ? `<span class="grafo-ref mais" style="--cor-ref:${cor(col)}" title="${esc(todasRefs.slice(2).join('\n'))}">+${todasRefs.length - 2}</span>` : '');
         const iniciais = String(c.autor || '?').split(/\s+/).map(p => p[0]).slice(0, 2).join('').toUpperCase();
-        linhasHtml.push(`<button class="grafo-linha" data-git-commit="${esc(c.hash)}" data-dica-html="${esc(dicaCommit(c, iniciais, todasRefs, cor(col)))}">${refs}<span class="grafo-assunto">${esc(c.assunto)}</span><span class="grafo-quando">${esc(quandoCurto(c.quando))}</span><span class="grafo-autor-ic" style="--cor-ref:${cor(col)}" title="${esc(c.autor)}" data-email="${esc(String(c.email || '').toLowerCase())}" data-hash="${esc(c.hash)}">${esc(iniciais)}</span></button>`);
+        linhasSvg.push(svg.join(''));
+        linhasHtml.push(`<button class="grafo-linha" data-git-commit="${esc(c.hash)}" aria-expanded="false" data-dica-html="${esc(dicaCommit(c, iniciais, todasRefs, cor(col)))}">${refs}<span class="grafo-assunto">${esc(c.assunto)}</span><span class="grafo-quando">${esc(quandoCurto(c.quando))}</span><span class="grafo-autor-ic" style="--cor-ref:${cor(col)}" title="${esc(c.autor)}" data-email="${esc(String(c.email || '').toLowerCase())}" data-hash="${esc(c.hash)}">${esc(iniciais)}</span></button>`);
     });
     const larg = GRAFO_X0 * 2 + (Math.min(largura, 12) - 1) * GRAFO_DX;
-    return (semPais ? '<p class="nota">Reinicie o Red Code para ver as ligações entre as branches.</p>' : '') + `<div class="grafo-vis" style="--grafo-larg:${larg}px"><svg class="grafo-svg" width="${larg}" height="${commits.length * GRAFO_ALT}" fill="none" stroke-width="2" stroke-linecap="round">${svg.join('')}</svg><div class="grafo-linhas">${linhasHtml.join('')}</div></div>`;
+    const svgDe = (conteudo, alt) => `<svg class="grafo-svg" width="${larg}" height="${alt}" fill="none" stroke-width="2" stroke-linecap="round">${conteudo}</svg>`;
+    const itens = commits.map((c, r) => `<div class="grafo-item"><div class="grafo-fila">${svgDe(linhasSvg[r], GRAFO_ALT)}${linhasHtml[r]}</div>`
+        + `<div class="grafo-exp" hidden>${svgDe(continuacoes[r].map(i => `<path d="M${x(i)} 0V4000" stroke="${cor(i)}"/>`).join(''), '100%')}<div class="grafo-arqs"></div></div></div>`).join('');
+    return (semPais ? '<p class="nota">Reinicie o Red Code para ver as ligações entre as branches.</p>' : '') + `<div class="grafo-vis" style="--grafo-larg:${larg}px">${itens}</div>`;
 }
 // Fotos dos autores (do GitHub, via servidor): uma busca por e-mail nesta janela; sem foto fica a inicial
 const fotosGit = new Map();
@@ -3171,6 +3356,29 @@ function carregaFotosGrafo(el) {
             el.querySelectorAll(`.grafo-autor-ic[data-email="${CSS.escape(email)}"]`).forEach(ic => { ic.classList.add('com-foto'); ic.innerHTML = `<img src="${url}" alt="">`; });
         });
     }
+}
+// Arquivos do commit logo abaixo dele no grafo (como no VS Code): clicar num arquivo mostra o que mudou
+async function alternaCommitGrafo(hash, botao) {
+    const item = botao.closest('.grafo-item');
+    if (!item) return mostraCommitGit(hash);
+    const exp = item.querySelector('.grafo-exp'), abrir = exp.hidden;
+    exp.hidden = !abrir;
+    item.classList.toggle('aberto', abrir);
+    botao.setAttribute('aria-expanded', String(abrir));
+    if (!abrir || exp.dataset.carregado === '1') return;
+    const lista = exp.querySelector('.grafo-arqs');
+    lista.innerHTML = '<p class="nota grafo-arqs-nota">Carregando…</p>';
+    try {
+        const c = await getPainel(`/api/git/commit?cwd=${encodeURIComponent(pastaDoGit())}&hash=${encodeURIComponent(hash)}`);
+        exp.dataset.carregado = '1';
+        lista.innerHTML = (c.arquivos.length ? c.arquivos.map(a => {
+            const partes = a.caminho.split('/'), nome = partes.pop();
+            return `<button type="button" class="grafo-arq" data-git-arq-commit="${esc(a.caminho)}" data-hash="${esc(c.hash)}" title="Ver o que mudou em ${esc(a.caminho)}">
+                ${iconeGit(nome)}<span class="grafo-arq-nome">${esc(nome)}${partes.length ? ` <small>${esc(partes.join('/'))}</small>` : ''}</span>
+                <span class="git-letra letra-${esc(a.letra)}" title="${esc(LETRAS_GIT[a.letra] || a.letra)}">${esc(a.letra)}</span></button>`;
+        }).join('') : '<p class="nota grafo-arqs-nota">Nenhum arquivo neste commit.</p>')
+            + `<button type="button" class="grafo-arq-detalhes" data-git-commit-detalhes="${esc(c.hash)}">Detalhes do commit</button>`;
+    } catch (e) { lista.innerHTML = `<p class="nota grafo-arqs-nota">${esc(e.message)}</p>`; }
 }
 async function carregaGrafo() {
     const el = document.getElementById('gitGrafo');
@@ -4454,19 +4662,52 @@ const temaIcone = () => document.documentElement.dataset.temaEfetivo === 'claro'
 function imgIcone(nome, pasta, aberta) {
     return `<img class="ic-arq" alt="" src="/icone-arquivo?nome=${encodeURIComponent(nome)}&tema=${temaIcone()}${pasta ? '&pasta=1' + (aberta ? '&aberta=1' : '') : ''}">`;
 }
-function petMini(tipo, rodando, papelFixo, corFixa) {
+/* ---------- Mascotes personalizáveis: cada agente montado por partes (o visual escolhido fica neste computador) ---------- */
+let VISUAL_PETS = {};
+const PARTES_PET = [
+    ['forma', 'Corpo', [['gota', 'Gota'], ['quadrado', 'Quadrado'], ['redondo', 'Redondo'], ['largo', 'Largo'], ['alto', 'Alto'], ['pera', 'Pera']]],
+    ['olhos', 'Olhos', [['normal', 'Normal'], ['grandes', 'Grandes'], ['brilho', 'Brilho'], ['felizes', 'Felizes'], ['sono', 'Sono'], ['bravo', 'Bravo']]],
+    ['boca', 'Boca', [['nenhuma', 'Nenhuma'], ['sorriso', 'Sorriso'], ['aberta', 'Aberta'], ['lingua', 'Língua'], ['gato', 'Gato']]],
+    ['bochechas', 'Bochechas', [['nao', 'Sem'], ['sim', 'Coradas']]],
+    ['chapeu', 'Chapéu', [['nenhum', 'Nenhum'], ['orelhas', 'Orelhas'], ['chifres', 'Chifres'], ['antena', 'Antena'], ['antenas', 'Antenas'], ['formatura', 'Formatura'], ['boina', 'Boina'], ['cartola', 'Cartola'], ['coroa', 'Coroa'], ['laco', 'Laço'], ['folha', 'Folha'], ['parabolica', 'Parabólica']]],
+    ['cara', 'Óculos', [['nenhum', 'Nenhum'], ['oculos', 'Óculos'], ['escuros', 'Escuros'], ['monoculo', 'Monóculo']]],
+    ['jeito', 'Jeito', [['pula', 'Pula'], ['balanca', 'Balança'], ['acena', 'Acena'], ['flutua', 'Flutua'], ['parado', 'Parado']]],
+];
+const ITENS_PET = [['', 'Nenhum'], ['lupa', 'Lupa'], ['nota', 'Nota'], ['prancheta', 'Prancheta'], ['tubo', 'Tubo'], ['lapis', 'Lápis'], ['mapa', 'Mapa'], ['globo', 'Globo'], ['robo', 'Robô'], ['engrenagem', 'Engrenagem'], ['raio', 'Raio']];
+const CORES_PET = ['#7aa2f7', '#7dcfff', '#73daca', '#9ece6a', '#e0af68', '#ff9e64', '#f7768e', '#ff6ac1', '#bb9af7', '#c0caf5', '#a9b1d6', '#e8483d'];
+// O visual de antes da personalização, por papel (assim nada muda até você mexer)
+const PADRAO_PAPEL = {
+    explorador: { forma: 'gota', chapeu: 'orelhas' }, revisor: { forma: 'quadrado', cara: 'oculos', jeito: 'acena' },
+    testador: { forma: 'redondo', chapeu: 'antena' }, conferente: { chapeu: 'formatura', jeito: 'balanca' },
+    escritor: { chapeu: 'boina', jeito: 'balanca' }, planejador: { forma: 'largo', chapeu: 'antenas' }, leitor: { chapeu: 'parabolica' },
+};
+const PAPEL_ITEM = { explorador: 'lupa', revisor: 'nota', testador: 'tubo', conferente: 'prancheta', escritor: 'lapis', planejador: 'mapa', leitor: 'globo' };
+function visualPadrao(tipo, papelFixo, corFixa) {
     const [cor, , , papel] = PETS[String(tipo).toLowerCase()] || ['#a9b1d6', '', '', 'generico'];
-    return `<span class="pet-mini pet-${papelFixo || papel} ${rodando ? 'rodando' : ''}" style="--cor-pet:${corFixa || cor}" aria-hidden="true"><span class="pet-corpo"><span class="pet-extra"></span></span></span>`;
+    const p = papelFixo || papel;
+    return { cor: corFixa || cor, forma: 'gota', olhos: 'normal', boca: 'nenhuma', bochechas: 'nao', chapeu: 'nenhum', cara: 'nenhum', jeito: 'pula', item: PAPEL_ITEM[p] || 'robo', ...(PADRAO_PAPEL[p] || {}) };
 }
+function visualPet(tipo, papelFixo, corFixa) {
+    const proprio = VISUAL_PETS[String(tipo).toLowerCase()];
+    return proprio ? { ...visualPadrao(tipo, papelFixo, corFixa), ...proprio } : visualPadrao(tipo, papelFixo, corFixa);
+}
+const classesPet = (v) => `pet-v forma-${v.forma} olhos-${v.olhos} boca-${v.boca} chapeu-${v.chapeu} cara-${v.cara} jeito-${v.jeito}${v.bochechas === 'sim' ? ' com-bochechas' : ''}`;
+const CORPO_PET = '<span class="pet-corpo"><span class="pet-extra"></span><span class="pet-cara"></span><span class="pet-rosto"></span></span>';
+function petMiniVisual(v, rodando) {
+    return `<span class="pet-mini ${classesPet(v)} ${rodando ? 'rodando' : ''}" style="--cor-pet:${v.cor}" aria-hidden="true">${CORPO_PET}</span>`;
+}
+function petMini(tipo, rodando, papelFixo, corFixa) { return petMiniVisual(visualPet(tipo, papelFixo, corFixa), rodando); }
+fetch('/api/visual-pets', { headers: { 'X-Painel': '1' } }).then(r => (r.ok ? r.json() : {})).then(v => { VISUAL_PETS = v || {}; if (typeof ultimosDados !== 'undefined' && ultimosDados) redesenha(ultimosDados); }).catch(() => { /* sem visual próprio */ });
 function petsAgentes(d, emCurso) {
     const lista = (d.agentes || []).filter(a => a.status === 'rodando').map(a => ({ tipo: a.tipoAgente || 'agente', desc: a.descricao || '', modelo: a.modelo || '' }));
     // Agente recém-chamado que ainda não apareceu na pasta de subagentes
     if (!lista.length && emCurso && emCurso.tipo === 'agente') lista.push({ tipo: emCurso.texto.split(':')[0].trim() || 'agente', desc: emCurso.texto.split(':').slice(1).join(':').trim() });
     return lista.slice(0, 8).map((a, n) => {
-        const [cor, item, faz, papel] = PETS[String(a.tipo).toLowerCase()] || ['#a9b1d6', ICONE.robo, 'trabalhando', 'generico'];
+        const [, , faz] = PETS[String(a.tipo).toLowerCase()] || ['', '', 'trabalhando'];
+        const v = visualPet(a.tipo);
         const modelo = a.modelo ? modeloCurto(a.modelo) : '';
-        return `<div class="pet pet-${papel}" data-chave="a:${esc(a.tipo)}:${n}" title="${esc(a.tipo + (modelo ? ' (' + modelo + ')' : '') + (a.desc ? ': ' + a.desc : ''))}" style="--cor-pet:${cor};--atraso:${(n * 0.27).toFixed(2)}s">
-            <div class="pet-corpo"><span class="pet-extra" aria-hidden="true"></span><span class="pet-item" aria-hidden="true">${item}</span></div>
+        return `<div class="pet ${classesPet(v)}" data-chave="a:${esc(a.tipo)}:${n}" title="${esc(a.tipo + (modelo ? ' (' + modelo + ')' : '') + (a.desc ? ': ' + a.desc : ''))}" style="--cor-pet:${v.cor};--atraso:${(n * 0.27).toFixed(2)}s">
+            <div class="pet-corpo"><span class="pet-extra" aria-hidden="true"></span><span class="pet-cara" aria-hidden="true"></span><span class="pet-rosto" aria-hidden="true"></span>${v.item && ICONE[v.item] ? `<span class="pet-item" aria-hidden="true">${ICONE[v.item]}</span>` : ''}</div>
             <div class="pet-sombra"></div>
             <span class="pet-nome">${esc(a.tipo)}</span>
             <span class="pet-faz">${faz}</span>
@@ -4796,7 +5037,7 @@ function desenhaLateral(d) {
     const totalLinha = execucoes.length + (d.contagem.refinados ? 1 : 0);
     let html = `<section class="lt">
         <div class="lt-cab"><h2>Agentes${rodando.length ? `<span>${rodando.length}</span>` : ''}</h2>${d.agentes.length ? '<button class="lt-link" id="btnMapa" title="Abrir o mapa de agentes (m)">Ver mapa</button>' : ''}</div>
-        ${execucoes.length || d.contagem.refinados ? `<div class="lt-palco ${rodando.length ? 'ativo' : ''}">${pets ? `<div class="lt-atores">${pets}</div>` : CENA_PALCO_VAZIO}<small>${esc(legenda)}</small></div>` : '<p class="nota">Nenhum agente usado nesta conversa ainda.</p>'}
+        ${`<div class="lt-palco ${rodando.length ? 'ativo' : ''}">${pets ? `<div class="lt-atores">${pets}</div>` : CENA_PALCO_VAZIO}<small>${esc(execucoes.length || d.contagem.refinados ? legenda : 'Nenhum agente usado nesta conversa ainda')}</small></div>`}
         ${itens ? `<button class="lt-alterna" id="btnLinhaTempo" aria-expanded="${linhaTempoAberta}"><span>O que aconteceu</span><small>${totalLinha}</small><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>` : ''}
         ${itens && linhaTempoAberta ? `<div class="lt-lista">${itens}</div>${execucoes.length > LIMITE_LT ? `<p class="nota">+ ${execucoes.length - LIMITE_LT} mais antigos no histórico</p>` : ''}` : ''}
     </section>`;
@@ -5271,6 +5512,36 @@ const janelaConfig = document.getElementById('janelaConfig');
 function lePref(k, padrao) { try { return localStorage.getItem('painelPref_' + k) || padrao; } catch (e) { return padrao; } }
 function gravaPref(k, v) { try { localStorage.setItem('painelPref_' + k, v); } catch (e) { /* sem armazenamento */ } }
 const temaClaroDoSistema = matchMedia('(prefers-color-scheme: light)');
+// Cores próprias: cada uma, se escolhida, vira uma variável --c-* e liga a regra que troca a paleta
+const CORES_TEMA = [['corPrincipal', 'principal'], ['corSecundaria', 'secundaria'], ['corFundo', 'fundo']];
+function aplicaCores() {
+    const r = document.documentElement;
+    for (const [pref, nome] of CORES_TEMA) {
+        const v = lePref(pref, '');
+        if (/^#[0-9a-f]{6}$/i.test(v)) { r.style.setProperty('--c-' + nome, v); r.setAttribute('data-cor-' + nome, ''); }
+        else { r.style.removeProperty('--c-' + nome); r.removeAttribute('data-cor-' + nome); }
+    }
+}
+// Paletas prontas: [nome, principal, secundária, tom do fundo] ('' = a do Red Code)
+const PALETAS_TEMA = [
+    ['Red Code', '', '', ''], ['Oceano', '#3d8be8', '#9db7d8', '#3d8be8'], ['Floresta', '#3fae6a', '#a7c4a0', '#3fae6a'],
+    ['Ametista', '#9b6bff', '#c3b6e6', '#9b6bff'], ['Âmbar', '#f0a030', '#d8c7a6', '#f0a030'], ['Chiclete', '#ff5fa2', '#d9b3c9', '#ff5fa2'], ['Grafite', '#9aa3ad', '#b9bec6', '#5f6b78'],
+];
+function linhaCores() {
+    const atual = CORES_TEMA.map(([p]) => lePref(p, ''));
+    const css = getComputedStyle(document.documentElement);
+    const valorDe = (i, varCss) => atual[i] || (css.getPropertyValue(varCss).trim().match(/^#[0-9a-f]{6}$/i) || ['#888888'])[0];
+    const paletas = PALETAS_TEMA.map(([nome, p, s, f]) => {
+        const escolhida = atual[0] === p && atual[1] === s && atual[2] === f;
+        const cor1 = p || '#e8483d', cor2 = s || '#bdb6c6';
+        return `<button type="button" class="paleta-tema ${escolhida ? 'escolhida' : ''}" data-paleta="${esc([p, s, f].join('|'))}" title="${esc(nome)}"><span class="paleta-bola" style="background:linear-gradient(135deg, ${cor1} 50%, ${cor2} 50%)"></span>${esc(nome)}</button>`;
+    }).join('');
+    const seletor = (i, pref, rotulo, varCss) => `<label class="cor-tema">${rotulo}<input type="color" data-cor-tema="${pref}" value="${esc(valorDe(i, varCss))}"></label>`;
+    return linhaConfig('Cores', 'Escolha uma paleta ou monte a sua. Principal: botões, destaques e as suas mensagens. Secundária: as respostas do Claude. Fundo: o tom do fundo, das faixas e das bordas.',
+        `<div class="cores-tema"><div class="paletas-tema">${paletas}</div>
+            <div class="seletores-tema">${seletor(0, 'corPrincipal', 'Principal', '--voce')}${seletor(1, 'corSecundaria', 'Secundária', '--modelo')}${seletor(2, 'corFundo', 'Fundo', '--papel')}
+            <button type="button" class="mini" data-cores-padrao>Restaurar</button></div></div>`, 'cor cores paleta principal secundaria fundo tema personalizado');
+}
 function aplicaAparencia() {
     const r = document.documentElement, tema = lePref('tema', 'escuro');
     r.dataset.temaEfetivo = tema === 'claro' || (tema === 'sistema' && temaClaroDoSistema.matches) ? 'claro' : 'escuro';
@@ -5278,6 +5549,7 @@ function aplicaAparencia() {
     r.dataset.fonteUi = lePref('fonteUi', 'padrao');
     r.dataset.fonteResposta = lePref('fonteResposta', 'interface');
     r.dataset.tamTexto = lePref('tamTexto', 'medio');
+    aplicaCores();
     document.querySelectorAll('img.ic-arq').forEach(i => { i.src = i.src.replace(/tema=\w+/, 'tema=' + temaIcone()); });
 }
 // "Seguir o Windows": troca sozinho quando o Windows muda de claro para escuro
@@ -5322,6 +5594,7 @@ const SECOES_CONFIG = {
             `<button type="button" data-pref-tema="${v}" aria-pressed="${v === tema}" title="${t}" aria-label="${t}">${ICONES_TEMA[v]}</button>`).join('');
         return '<h3 class="config-titulo">Aparência</h3>'
             + linhaConfig('Tema', 'Claro, escuro ou o mesmo do Windows. No claro, o editor de código usa as cores do Light+ do VS Code.', `<div class="config-segmentado" role="group" aria-label="Tema">${seg}</div>`, 'claro escuro sistema windows')
+            + linhaCores()
             + linhaConfig('Fonte da interface', '', opcoesConfig('fonteUi', [['padrao', 'Padrão · IBM Plex Sans'], ['sistema', 'Sistema · Segoe UI']], lePref('fonteUi', 'padrao')))
             + linhaConfig('Fonte das respostas', 'A letra das respostas do Claude.', opcoesConfig('fonteResposta', [['interface', 'Combinar com a interface'], ['serifada', 'Serifada'], ['mono', 'Monoespaçada']], lePref('fonteResposta', 'interface')))
             + linhaConfig('Tamanho do texto da conversa', '', opcoesConfig('tamTexto', [['pequeno', 'Pequeno'], ['medio', 'Médio'], ['grande', 'Grande']], lePref('tamTexto', 'medio')))
@@ -5405,8 +5678,27 @@ function filtraConfig() {
     document.querySelectorAll('#corpoConfig [data-busca]').forEach(l => { l.hidden = !casa(l.dataset.busca); });
 }
 document.getElementById('buscaConfig').addEventListener('input', filtraConfig);
+// Cores do tema: ao vivo enquanto arrasta o seletor; paletas e "Restaurar" redesenham a linha
+janelaConfig.addEventListener('input', (evt) => {
+    const c = evt.target.closest('[data-cor-tema]');
+    if (!c) return;
+    gravaPref(c.dataset.corTema, c.value);
+    aplicaCores();
+    document.querySelectorAll('.paleta-tema.escolhida').forEach(b => b.classList.remove('escolhida'));
+});
+janelaConfig.addEventListener('click', (evt) => {
+    const pal = evt.target.closest('[data-paleta]'), padrao = evt.target.closest('[data-cores-padrao]');
+    if (!pal && !padrao) return;
+    const valores = pal ? pal.dataset.paleta.split('|') : ['', '', ''];
+    CORES_TEMA.forEach(([pref], i) => gravaPref(pref, valores[i] || ''));
+    aplicaCores();
+    const linha = (pal || padrao).closest('.config-linha');
+    if (linha) linha.outerHTML = linhaCores();
+    recado(pal ? 'Paleta ' + pal.title : 'Cores do Red Code de volta');
+});
 janelaConfig.addEventListener('change', async (evt) => {
     const alvo = evt.target;
+    if (alvo.dataset.corTema) return recado('Cor salva');
     if (alvo.dataset.pref) {
         if (alvo.dataset.pref === 'visualCodigo') return defineVisualCodigo(alvo.value);
         gravaPref(alvo.dataset.pref, alvo.value);
@@ -5484,6 +5776,7 @@ function cartaoAgenteConfig(a) {
         <div class="config-agente-acoes">
             ${a.editavel ? '<button class="mini" data-agente-editar>Editar</button>' : `<small class="nota">${a.cortado ? 'Arquivo grande: edite pelo VS Code.' : 'Nome de arquivo fora do padrão: edite pelo VS Code.'}</small>`}
             <button class="mini" data-abrir-regra="${esc(a.arquivo)}" title="${esc(a.arquivo)}">Abrir no VS Code</button>
+            <button class="mini" data-personalizar-pet="${esc(a.nome)}" title="Escolher como o mascote deste agente se parece">🎨 Personalizar</button>
             ${limiteEsforcoAgente(a)}
             <button class="mini perigo" data-agente-apagar>Apagar</button>
         </div>
@@ -5548,6 +5841,10 @@ async function mudaAgente(corpo, recadoOk) {
     } catch (e) { recado(e.message); return false; }
 }
 const camposDoForm = (form) => Object.fromEntries([...form.querySelectorAll('[data-campo]')].map(c => [c.dataset.campo, c.value]));
+document.addEventListener('click', (evt) => {
+    const b = evt.target.closest('[data-personalizar-pet]');
+    if (b) abreEditorPet(b.dataset.personalizarPet);
+});
 janelaConfig.addEventListener('change', (evt) => {
     const limite = evt.target.closest('[data-limite-esforco]');
     if (limite) {
@@ -5598,6 +5895,20 @@ const corPerfil = (cor) => /^#[0-9a-f]{6}$/i.test(String(cor || '')) ? cor : '#7
 function bolinhaPerfil(p, tam = 18) {
     return `<span class="perfil-bolinha" style="--cor-perfil:${corPerfil(p && p.cor)};width:${tam}px;height:${tam}px;font-size:${Math.round(tam * .42)}px">${esc(iniciaisPerfil(p && p.nome))}</span>`;
 }
+// A pílula de uso minimizada divide o rodapé com o seletor de perfil: cabe no que sobra ou mostra só o maior limite
+function ajustaPilulaUso() {
+    const el = document.getElementById('usoPlano'), chip = document.getElementById('chipPerfil');
+    if (!el || !el.classList.contains('minimizado') || el.hidden) return;
+    const txt = el.querySelector('.uso-texto');
+    if (!txt) return;
+    const nav = document.querySelector('nav.sessoes');
+    const larguraChip = chip && chip.offsetWidth ? chip.offsetWidth + 8 : 0;
+    const cabe = Math.max(80, (nav ? nav.getBoundingClientRect().width : 252) - 20 - larguraChip);
+    el.style.maxWidth = cabe + 'px';
+    txt.innerHTML = txt.dataset.completo;
+    if (el.scrollWidth > cabe + 1 || txt.scrollWidth > txt.clientWidth + 1) txt.innerHTML = txt.dataset.curto;
+}
+window.addEventListener('resize', () => ajustaPilulaUso());
 // Seletor no topo (dados vêm do /api/versao, que a página já consulta)
 function atualizaChipPerfil(v) {
     if (!v || !v.perfil) return;
@@ -5607,6 +5918,7 @@ function atualizaChipPerfil(v) {
     if (!chip) return;
     chip.innerHTML = `${bolinhaPerfil(v.perfil)}<span class="perfil-nome">${esc(v.perfil.nome)}</span>${perfilPendenteInfo ? `<span class="perfil-seta">→ ${esc(perfilPendenteInfo.nome)}</span>` : ''}`;
     chip.classList.toggle('pendente', !!perfilPendenteInfo);
+    requestAnimationFrame(ajustaPilulaUso);
     chip.setAttribute('title', perfilPendenteInfo ? `Trocando para ${perfilPendenteInfo.nome} quando nada estiver rodando (clique para ver)` : `Perfil ${v.perfil.nome}: conta do Claude e identidade do Git (clique para trocar)`);
     atualizaTitulo();
 }
@@ -5961,11 +6273,75 @@ janelaConfig.addEventListener('click', async (ev) => {
 });
 let agendamentosTela = [];
 
+/* ---------- Editor de mascote (como criar personagem de jogo) ---------- */
+const janelaPet = document.getElementById('janelaPet');
+let petEditando = null, petRascunho = null;
+const rascunhosPet = new Map();   // mudanças ainda não salvas de cada mascote (trocar de mascote não perde)
+function mascotesConhecidos() {
+    const nomes = new Set(['explore', 'plan', 'general-purpose', 'hook']);
+    for (const g of (regrasAtuais && regrasAtuais.grupos) || []) for (const a of g.agentes) nomes.add(String(a.nome).toLowerCase());
+    for (const n of Object.keys(VISUAL_PETS)) nomes.add(n);
+    return [...nomes].sort();
+}
+function abreEditorPet(nome) {
+    petEditando = String(nome || 'general-purpose').toLowerCase();
+    petRascunho = rascunhosPet.get(petEditando) || visualPet(petEditando);
+    document.getElementById('petQuem').innerHTML = mascotesConhecidos().map(n => `<option value="${esc(n)}" ${n === petEditando ? 'selected' : ''}>${esc(n)}${VISUAL_PETS[n] ? ' ★' : ''}</option>`).join('');
+    janelaPet.hidden = false;
+    desenhaEditorPet();
+}
+function desenhaEditorPet() {
+    const v = petRascunho;
+    const [, , faz] = PETS[petEditando] || ['', '', 'trabalhando'];
+    document.getElementById('petVitrine').style.setProperty('--cor-previa', v.cor);
+    document.getElementById('petPrevia').innerHTML = `<div class="pet ${classesPet(v)}" style="--cor-pet:${v.cor}"><div class="pet-corpo"><span class="pet-extra"></span><span class="pet-cara"></span><span class="pet-rosto"></span>${v.item && ICONE[v.item] ? `<span class="pet-item">${ICONE[v.item]}</span>` : ''}</div><div class="pet-sombra"></div><span class="pet-faz">${esc(faz)}</span></div>`;
+    const grade = (parte, titulo, opcoes) => `<section class="pet-parte"><h4>${titulo}</h4><div class="pet-grade">${opcoes.map(([val, nome]) => `<button type="button" class="pet-opcao ${v[parte] === val ? 'escolhida' : ''}" data-pet-parte="${parte}" data-pet-valor="${val}" title="${esc(nome)}">${petMiniVisual({ ...v, [parte]: val }, false)}<small>${esc(nome)}</small></button>`).join('')}</div></section>`;
+    const cores = `<section class="pet-parte"><h4>Cor</h4><div class="pet-grade">${CORES_PET.map(c => `<button type="button" class="pet-cor ${v.cor === c ? 'escolhida' : ''}" data-pet-cor="${c}" style="background:${c}" title="${c}" aria-label="Cor ${c}"></button>`).join('')}<input type="color" class="pet-cor-livre" data-pet-cor-livre value="${esc(v.cor)}" title="Outra cor" aria-label="Outra cor"></div></section>`;
+    const itens = `<section class="pet-parte"><h4>Objeto (quando está trabalhando)</h4><div class="pet-grade">${ITENS_PET.map(([val, nome]) => `<button type="button" class="pet-opcao ${v.item === val ? 'escolhida' : ''}" data-pet-parte="item" data-pet-valor="${val}" title="${esc(nome)}"><span class="ic-item">${val ? ICONE[val] : '—'}</span><small>${esc(nome)}</small></button>`).join('')}</div></section>`;
+    const lista = document.getElementById('petOpcoes'), rolagem = lista.scrollTop;
+    lista.innerHTML = cores + PARTES_PET.map(([p, t, o]) => grade(p, t, o)).join('') + itens;
+    lista.scrollTop = rolagem;
+}
+function mudaPet(parte, valor) { petRascunho = { ...petRascunho, [parte]: valor }; rascunhosPet.set(petEditando, petRascunho); desenhaEditorPet(); }
+janelaPet.addEventListener('click', async (ev) => {
+    if (ev.target === janelaPet || ev.target.closest('[data-fechar-pet]')) { janelaPet.hidden = true; rascunhosPet.clear(); return; }
+    const op = ev.target.closest('[data-pet-parte]');
+    if (op) return mudaPet(op.dataset.petParte, op.dataset.petValor);
+    const cor = ev.target.closest('[data-pet-cor]');
+    if (cor) return mudaPet('cor', cor.dataset.petCor);
+    if (ev.target.closest('[data-pet-aleatorio]')) {
+        const sorteia = (l) => l[Math.floor(Math.random() * l.length)];
+        const novo = { ...petRascunho, cor: sorteia(CORES_PET), item: sorteia(ITENS_PET.slice(1))[0] };
+        for (const [p, , o] of PARTES_PET) novo[p] = sorteia(o)[0];
+        petRascunho = novo; rascunhosPet.set(petEditando, novo);
+        return desenhaEditorPet();
+    }
+    if (ev.target.closest('[data-pet-padrao]')) { petRascunho = visualPadrao(petEditando); rascunhosPet.set(petEditando, petRascunho); return desenhaEditorPet(); }
+    if (ev.target.closest('[data-pet-salvar]')) {
+        try {
+            // Igual ao padrão: apaga o personalizado (volta a seguir o padrão do papel)
+            const padrao = visualPadrao(petEditando);
+            const igual = Object.keys(padrao).every(k => padrao[k] === petRascunho[k]);
+            VISUAL_PETS = await api('/api/visual-pets', { nome: petEditando, visual: igual ? null : petRascunho });
+            rascunhosPet.delete(petEditando);
+            recado(`Mascote ${petEditando} salvo`);
+            janelaPet.hidden = true;
+            if (ultimosDados) redesenha(ultimosDados);
+            if (!janelaConfig.hidden && regrasAtuais) document.getElementById('corpoConfig').innerHTML = desenhaRegras(regrasAtuais, pastaDaConversa());
+        } catch (e) { recado(e.message); }
+    }
+});
+janelaPet.addEventListener('input', (ev) => { if (ev.target.matches('[data-pet-cor-livre]')) { petRascunho = { ...petRascunho, cor: ev.target.value }; rascunhosPet.set(petEditando, petRascunho); document.getElementById('petPrevia').querySelector('.pet').style.setProperty('--cor-pet', ev.target.value); document.getElementById('petVitrine').style.setProperty('--cor-previa', ev.target.value); } });
+janelaPet.addEventListener('change', (ev) => {
+    if (ev.target.matches('[data-pet-cor-livre]')) return mudaPet('cor', ev.target.value);
+    if (ev.target.id === 'petQuem') { rascunhosPet.set(petEditando, petRascunho); abreEditorPet(ev.target.value); }
+});
+
 /* ---------- /mcp: servidores MCP da conversa (estado, ferramentas, reconectar, ligar/desligar, entrar) ---------- */
 const janelaMcp = document.getElementById('janelaMcp');
 const GRUPOS_MCP = { user: 'Seus (todos os projetos)', project: 'Do projeto', local: 'Locais (só você, neste projeto)', claudeai: 'claude.ai', dynamic: 'Dinâmicos', plugin: 'Plugins', sdk: 'Red Code', agent: 'De agentes', managed: 'Gerenciados', enterprise: 'Gerenciados' };
 const ESTADO_MCP = { connected: ['ok', '✓ Conectado'], failed: ['erro', 'Falhou'], 'needs-auth': ['atencao', 'Precisa entrar'], pending: ['espera', 'Conectando…'], disabled: ['off', 'Desligado'] };
-let mcpLista = [];
+let mcpLista = [], mcpDeNovo = null, mcpLendo = false;
 const mcpAbertos = new Set();
 async function abreMcp() {
     if (!sessaoAtual || sessaoEhChat()) return recado('Abra uma conversa de código para ver os servidores MCP dela.');
@@ -5976,6 +6352,9 @@ async function abreMcp() {
     await carregaMcp();
 }
 async function carregaMcp() {
+    clearTimeout(mcpDeNovo);
+    if (mcpLendo || !sessaoAtual) return;
+    mcpLendo = true;
     const [projeto, sessao] = sessaoAtual.split('/');
     try {
         const r = await fetch(`/api/mcp?projeto=${encodeURIComponent(projeto)}&sessao=${encodeURIComponent(sessao)}`, { headers: { 'X-Painel': '1' } });
@@ -5985,8 +6364,12 @@ async function carregaMcp() {
     } catch (e) {
         document.getElementById('listaMcp').innerHTML = `<p class="nota">Não deu para ler os servidores MCP: ${esc(e.message)}</p>`;
         return;
-    }
+    } finally { mcpLendo = false; }
     desenhaMcp();
+    // Algum ainda "Conectando…" numa conversa aberta aqui: pergunta de novo em 3 s enquanto a janela estiver aberta
+    // (com a conversa fechada cada leitura sobe um processo do Claude; o servidor já esperou eles subirem)
+    const viva = !!(conversaRelevante() && conversaRelevante().vivo);
+    if (viva && !janelaMcp.hidden && mcpLista.some(m => m.status === 'pending')) mcpDeNovo = setTimeout(() => { if (!janelaMcp.hidden) carregaMcp(); }, 3000);
 }
 function desenhaMcp() {
     const viva = !!(conversaRelevante() && conversaRelevante().vivo);
@@ -6433,6 +6816,7 @@ document.addEventListener('keydown', (ev) => {
         if (!lupa.hidden) { lupa.hidden = true; return; }
         if (!janelaMapa.hidden) { janelaMapa.hidden = true; return; }
         if (!janelaMcp.hidden) { janelaMcp.hidden = true; return; }
+        if (!janelaPet.hidden) { janelaPet.hidden = true; return; }
         if (!janelaReescritos.hidden) { janelaReescritos.hidden = true; return; }
         if (!ajuda.hidden) { ajuda.hidden = true; return; }
         if (!janelaNova.hidden) { janelaNova.hidden = true; return; }

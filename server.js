@@ -2391,6 +2391,34 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600', 'X-Content-Type-Options': 'nosniff' });
             return res.end(capa);
         }
+        // Mascotes dos agentes: o visual de cada um (Configurações › Regras e agentes › Personalizar)
+        if (url.pathname === '/api/visual-pets') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            if (req.method === 'GET') return responde(res, 200, leDados().visualPets || {});
+            try {
+                const corpo = await leCorpo(req, 1e4);
+                const nome = String(corpo.nome || '').toLowerCase();
+                if (!/^[a-z0-9:_-]{1,64}$/.test(nome)) return responde(res, 400, { erro: 'Mascote inválido.' });
+                const dados = leDados();
+                dados.visualPets = dados.visualPets || {};
+                if (!corpo.visual) delete dados.visualPets[nome];
+                else {
+                    // Só partes conhecidas, com valores curtos e cor em hexadecimal
+                    const v = {};
+                    for (const k of ['forma', 'olhos', 'boca', 'chapeu', 'cara', 'bochechas', 'item', 'jeito']) {
+                        const val = String(corpo.visual[k] == null ? '' : corpo.visual[k]);
+                        if (!/^[a-z]{0,20}$/.test(val)) return responde(res, 400, { erro: 'Visual inválido.' });
+                        v[k] = val;
+                    }
+                    const cor = String(corpo.visual.cor || '');
+                    if (!/^#[0-9a-f]{6}$/i.test(cor)) return responde(res, 400, { erro: 'Cor inválida.' });
+                    v.cor = cor.toLowerCase();
+                    dados.visualPets[nome] = v;
+                }
+                gravaDados(dados);
+                return responde(res, 200, dados.visualPets);
+            } catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
         if (url.pathname === '/api/midia') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             if (req.method === 'GET') return responde(res, 200, midia.le());
