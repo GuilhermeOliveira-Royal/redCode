@@ -2521,6 +2521,8 @@ const servidor = http.createServer(async (req, res) => {
         }
         if (url.pathname === '/api/midia') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            // Com ?versao=: segura a resposta até o estado mudar (play/pausa de fora aparece na hora, sem esperar a próxima pergunta)
+            if (req.method === 'GET' && url.searchParams.has('versao')) return responde(res, 200, await midia.espera(url.searchParams.get('versao'), 20000));
             if (req.method === 'GET') return responde(res, 200, midia.le());
             try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }

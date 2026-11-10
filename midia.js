@@ -5,7 +5,15 @@ const path = require('path');
 
 const COMANDOS = ['alternar', 'proxima', 'anterior'];
 let ultimoErro = '';
-let proc = null, estado = { nada: true }, capa = null, versaoCapa = 0, ultimoUso = 0, timerOcioso = null, falhas = 0, esperaReligar = 0;
+let proc = null, estado = { nada: true, versao: 0 }, capa = null, versaoCapa = 0, ultimoUso = 0, timerOcioso = null, falhas = 0, esperaReligar = 0;
+// Cada mudança ganha um número; quem pediu com o número antigo é respondido na hora
+let versao = 0;
+const esperando = new Set();
+function mudou(novo) {
+    estado = { ...novo, versao: ++versao };
+    for (const fn of esperando) fn();
+    esperando.clear();
+}
 
 function liga() {
     if (proc || process.platform !== 'win32' || Date.now() < esperaReligar) return;
@@ -26,7 +34,7 @@ function liga() {
             // Capa só vem quando a música muda ('' = música sem capa)
             if (typeof o.capa === 'string') { capa = o.capa ? Buffer.from(o.capa, 'base64') : null; versaoCapa++; }
             delete o.capa;
-            estado = { ...o, capa: capa ? versaoCapa : 0, lidoEm: Date.now() };
+            mudou({ ...o, capa: capa ? versaoCapa : 0, lidoEm: Date.now() });
         }
     });
     const morreu = () => {
@@ -45,7 +53,7 @@ function desliga() {
     proc = null;
     try { p.stdin.end(); } catch (e) { /* já fechado */ }
     setTimeout(() => { try { p.kill(); } catch (e) { /* já saiu */ } }, 3000);
-    estado = { nada: true };
+    mudou({ nada: true });
 }
 function usado() {
     ultimoUso = Date.now();
@@ -55,6 +63,16 @@ function usado() {
     timerOcioso.unref();
 }
 function le() { usado(); return estado; }
+// Responde quando o estado mudar desde a versão que a tela tem (ou ao fim do prazo, com o mesmo estado)
+function espera(versaoTela, prazo) {
+    usado();
+    if (Number(versaoTela) !== estado.versao) return Promise.resolve(estado);
+    return new Promise((resolve) => {
+        const fim = () => { clearTimeout(t); esperando.delete(fim); resolve(estado); };
+        const t = setTimeout(fim, prazo);
+        esperando.add(fim);
+    });
+}
 function comando(acao) {
     if (!COMANDOS.includes(acao)) throw new Error('Comando de mídia inválido.');
     usado();
@@ -63,4 +81,4 @@ function comando(acao) {
 }
 function capaAtual() { return capa; }
 
-module.exports = { le, comando, capaAtual, desliga };
+module.exports = { le, espera, comando, capaAtual, desliga };

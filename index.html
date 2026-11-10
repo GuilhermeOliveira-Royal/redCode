@@ -2770,11 +2770,36 @@ async function atualizaMidia() {
     if (document.hidden || JANELA_SECUNDARIA) return;
     let m;
     try { m = await getPainel('/api/midia'); } catch (e) { return; }
+    aplicaMidia(m);
+}
+let esperaSemMidia = null;
+function aplicaMidia(m) {
+    clearTimeout(esperaSemMidia);
     if (m && (m.erro === 'servico' || (!m.nada && !m.erro && m.titulo))) midiaAtual = m;
-    else if (midiaAtual && (!semMidiaDesde || Date.now() - semMidiaDesde < 5000)) { if (!semMidiaDesde) semMidiaDesde = Date.now(); return; }
+    else if (midiaAtual && (!semMidiaDesde || Date.now() - semMidiaDesde < 5000)) {
+        // Sumiu a mídia: segura a última por 5 s (troca de música passa por "nada"); depois confere de novo
+        if (!semMidiaDesde) semMidiaDesde = Date.now();
+        esperaSemMidia = setTimeout(() => aplicaMidia(m), 5100 - (Date.now() - semMidiaDesde));
+        return;
+    }
     else midiaAtual = m;
     desenhaMidia();
     atualizaPip();
+}
+// Fica perguntando "mudou desde a versão N?": o servidor só responde quando muda (ou em 20 s), então tocar ou
+// pausar fora do Red Code aparece na hora, sem esperar a próxima volta
+async function vigiaMidia() {
+    let versao = -1;
+    const pausa = (ms) => new Promise(r => setTimeout(r, ms));
+    while (true) {
+        if (document.hidden) { await pausa(1000); continue; }
+        try {
+            const m = await getPainel('/api/midia?versao=' + versao);
+            aplicaMidia(m);
+            // Servidor antigo (sem número de versão) responde na hora: volta a perguntar de 2 em 2 s
+            if (typeof m.versao !== 'number') { versao = -1; await pausa(2000); } else versao = m.versao;
+        } catch (e) { versao = -1; await pausa(2000); }
+    }
 }
 playerMidia.addEventListener('click', async (ev) => {
     if (ev.target.closest('[data-midia-dispensar]')) { avisoMidiaDispensado = true; return desenhaMidia(); }
@@ -2786,7 +2811,7 @@ playerMidia.addEventListener('click', async (ev) => {
     try { await api('/api/midia', { acao: b.dataset.midia }); } catch (e) { recado(e.message); }
     setTimeout(atualizaMidia, 700);
 });
-setInterval(atualizaMidia, 2000);
+if (!JANELA_SECUNDARIA) vigiaMidia();
 setInterval(() => { if (!playerMidia.hidden && !document.hidden) andaProgresso(); }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizaMidia(); });
 setTimeout(atualizaMidia, 0);
