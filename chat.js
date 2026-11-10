@@ -406,16 +406,25 @@ function registraTarefas(conversa, m) {
             inicio: (antes.get(t.task_id) || {}).inicio || Date.now(),
         }));
     } else if (m.subtype === 'task_notification') {
+        // Terminou (concluída, falhou ou parada): sai da lista já, sem esperar o próximo retrato
+        // (se ele se perde, a tarefa ficava "rodando" para sempre)
+        tiraTarefa(conversa, m.task_id);
         if (m.skip_transcript) return;
         conversa.tarefasFim.add(m.task_id + ':' + (m.run_id || ''));
+    } else if (m.subtype === 'task_updated' && m.patch && ['completed', 'failed', 'killed'].includes(m.patch.status)) {
+        tiraTarefa(conversa, m.task_id);
     }
+}
+function tiraTarefa(conversa, id) {
+    if (id && conversa.tarefasBg.some(t => t.id === id)) conversa.tarefasBg = conversa.tarefasBg.filter(t => t.id !== id);
 }
 
 // Para uma tarefa em segundo plano, sem interromper a conversa
 async function pararTarefa(chave, id) {
     const conversa = conversas.get(chave);
     if (!conversa || !conversa.vivo || !conversa.tarefasBg.some(t => t.id === id)) return false;
-    try { await conversa.q.stopTask(id); } catch (e) { return false; }
+    // O Claude Code recusa parar o que já acabou: aí ela só estava presa na lista, e sai dela
+    try { await conversa.q.stopTask(id); } catch (e) { tiraTarefa(conversa, id); return false; }
     return true;
 }
 
@@ -483,6 +492,27 @@ async function usoDoPlano() {
             if (rl.seven_day) limites.push({ nome: 'Semanal · todos os modelos', grupo: 'weekly', percentual: Math.round(rl.seven_day.utilization || 0), reinicia: rl.seven_day.resets_at });
         }
         return { disponivel: true, plano: u.subscription_type, limites, lidoEm: new Date().toISOString() };
+    } finally {
+        if (fila) { fila.close(); try { await q.return(); } catch (e) { /* já fechou */ } }
+    }
+}
+
+// Modelos que a conta pode usar (a lista do /model do Claude Code): modelo novo da Anthropic aparece aqui sozinho.
+// Mesmo jeito do uso do plano: processo vivo da conta, ou um que não recebe mensagem (não gasta tokens)
+async function modelosDisponiveis() {
+    const contaServidor = require('./perfis').contaDoEnv(process.env);
+    const viva = [...conversas.values()].find(c => c.vivo && c.q && (c.contaDir || contaServidor) === contaServidor);
+    let q = viva && viva.q, fila = null;
+    if (!q) {
+        const { query } = await carregaSdk();
+        fila = criaFila();
+        q = query({ prompt: fila, options: { cwd: require('os').homedir(), settingSources: [] } });
+    }
+    try {
+        return await Promise.race([
+            q.supportedModels(),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('demorou demais')), 20000)),
+        ]);
     } finally {
         if (fila) { fila.close(); try { await q.return(); } catch (e) { /* já fechou */ } }
     }
@@ -580,4 +610,4 @@ function agentesRodandoNa(chave) {
     return !!(c && c.sessionId && temAgentesRodando(c.projeto, c.sessionId));
 }
 
-module.exports = { CHAT_DIR, ehChat, agentesRodandoNa, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, configura, enviar, responder, parar, pararTarefa, trocaModo, fechaOciosas, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };
+module.exports = { CHAT_DIR, ehChat, agentesRodandoNa, voltarArquivos, ramificar, statusMcp, acaoMcp, comandosDisponiveis, usoDoPlano, modelosDisponiveis, configura, enviar, responder, parar, pararTarefa, trocaModo, fechaOciosas, estado, rodandoNaSessao, vivaNaSessao, pastaDoProjeto, MODOS };

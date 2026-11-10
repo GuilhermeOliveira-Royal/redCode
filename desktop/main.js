@@ -2,7 +2,7 @@
 // O Electron é só casca + lançador: o servidor continua no Node do sistema (igual ao de hoje),
 // como processo filho. Assim o SDK e os processos do Claude não mudam, e reiniciar o servidor
 // não derruba a janela.
-const { app, BrowserWindow, Tray, Menu, nativeImage, globalShortcut, shell, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, globalShortcut, shell, dialog, ipcMain, desktopCapturer, screen } = require('electron');
 const { spawn, execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -244,14 +244,16 @@ function criaJanela() {
     // O Electron pede o writeText como "clipboard-read"; a página é só o painel local (nada de fora carrega aqui).
     const PERMITIDAS = new Set(['notifications', 'clipboard-sanitized-write', 'clipboard-read']);
     // "clipboard-read" só para a janela principal (o editor não precisa ler a área de transferência)
-    const permitida = (wc, permissao) => PERMITIDAS.has(permissao) && (permissao !== 'clipboard-read' || (janela && wc === janela.webContents));
-    janela.webContents.session.setPermissionRequestHandler((wc, permissao, responde) => {
-        const ok = permitida(wc, permissao);
+    // "media" só vídeo (sem microfone) e só nas páginas do painel: é a captura da janela do vídeo que está tocando (clipe.js)
+    const capturaVideo = (wc, permissao, tipos) => permissao === 'media' && !tipos.includes('audio') && !!wc && (wc.getURL() === ORIGEM || wc.getURL().startsWith(ORIGEM + '/'));
+    const permitida = (wc, permissao, tipos) => capturaVideo(wc, permissao, tipos || []) || (PERMITIDAS.has(permissao) && (permissao !== 'clipboard-read' || (janela && wc === janela.webContents)));
+    janela.webContents.session.setPermissionRequestHandler((wc, permissao, responde, detalhes) => {
+        const ok = permitida(wc, permissao, (detalhes && detalhes.mediaTypes) || []);
         if (!ok) registra(`permissão negada (pedido): ${permissao}`);
         responde(ok);
     });
-    janela.webContents.session.setPermissionCheckHandler((wc, permissao) => {
-        const ok = permitida(wc, permissao);
+    janela.webContents.session.setPermissionCheckHandler((wc, permissao, origem, detalhes) => {
+        const ok = permitida(wc, permissao, detalhes && detalhes.mediaType ? [detalhes.mediaType] : []);
         if (!ok) registra(`permissão negada (checagem): ${permissao}`);
         return ok;
     });
@@ -314,10 +316,21 @@ function protegeJanela(win) {
                 width: 1300, height: 860, title: 'Editor · Red Code', icon: icone(256), backgroundColor: '#141011', autoHideMenuBar: true, webPreferences: PREFERENCIAS_WEB(),
             } };
         }
+        if (url.startsWith(ORIGEM + '/clipe.html')) {
+            // Vídeo desanexado: janela sem moldura, sempre por cima das outras (como o picture-in-picture do navegador)
+            // Nasce já no lugar (mover entre telas com zoom diferente depois de criada muda o tamanho)
+            const area = screen.getDisplayMatching(win.getBounds()).workArea;
+            return { action: 'allow', overrideBrowserWindowOptions: {
+                x: area.x + area.width - 480 - 24, y: area.y + area.height - 270 - 24, width: 480, height: 270, minWidth: 192, minHeight: 108, frame: false, alwaysOnTop: true, title: 'Vídeo · Red Code', icon: icone(256), backgroundColor: '#000000', autoHideMenuBar: true, webPreferences: PREFERENCIAS_WEB(),
+            } };
+        }
         abreFora(url);
         return { action: 'deny' };
     });
-    win.webContents.on('did-create-window', (filha) => protegeJanela(filha));
+    win.webContents.on('did-create-window', (filha, detalhes) => {
+        protegeJanela(filha);
+        if (detalhes && String(detalhes.url).startsWith(ORIGEM + '/clipe.html')) ajustaJanelaClipe(filha);
+    });
     // Página pediu para não fechar (alterações não salvas): no Electron isso cancela em silêncio, então pergunta
     win.webContents.on('will-prevent-unload', (ev) => {
         const dono = BrowserWindow.fromWebContents(win.webContents);
@@ -370,6 +383,152 @@ ipcMain.handle('painel:abrir-logs', async (ev) => {
     if (!janela || ev.sender !== janela.webContents) return false;
     return (await shell.openPath(PASTA_DADOS)) === '';
 });
+
+// ---------- Vídeo da mídia que está tocando (quadrinho do canto e janela desanexada) ----------
+const janelasClipe = new Set();
+// Apps instalados do navegador (identificador da extensão -> título da janela)
+const APPS_DO_NAVEGADOR = { cinhimbnkkghhklpknlkffjgod: 'youtube music' };
+const paginaDoPainel = (wc) => { const u = wc.getURL(); return u === ORIGEM || u.startsWith(ORIGEM + '/'); };
+const semAcento = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+// A janela de onde vem o som tem o nome da música no título (aba do YouTube, YouTube Music). Minimizada não aparece
+// na lista do Windows (e nem tem imagem); as janelas do próprio Red Code ficam de fora.
+ipcMain.handle('painel:clipe-fonte', async (ev, titulo, podeEsconder, app) => {
+    if (!paginaDoPainel(ev.sender)) return null;
+    const procura = semAcento(titulo);
+    if (!procura) return null;
+    // App instalado do navegador (PWA): pausado, o título da janela fica só com o nome do app
+    const crx = (String(app || "").match(/_crx_([a-p]+)/) || [])[1];
+    const nomeApp = crx && APPS_DO_NAVEGADOR[crx];
+    const combina = (nome) => { const n = semAcento(nome); return n.includes(procura) || (!!nomeApp && (n === nomeApp || n.startsWith(nomeApp + ' '))); };
+    // "window:<identificador>:0": compara só o identificador da janela
+    const janelaDe = (id) => String(id).split(':')[1];
+    const minhas = new Set(BrowserWindow.getAllWindows().map(w => janelaDe(w.getMediaSourceId())));
+    const procuraFonte = async () => {
+        const fontes = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+        const delas = fontes.filter(f => !minhas.has(janelaDe(f.id)) && !/· Red Code$|^Red Code$/.test(f.name));
+        return delas.find(f => semAcento(f.name).includes(procura)) || delas.find(f => combina(f.name));
+    };
+    let achada = await procuraFonte();
+    if (achada) return { id: achada.id, nome: achada.name, escondida: escondidas.has(Number(janelaDe(achada.id))) };
+    if (podeEsconder !== false) {
+        // Minimizada não tem imagem: sai do minimizado fora da tela (continua desenhando, ninguém vê)
+        const lista = await janelaVideo(['-Acao', 'lista']).then(l => Array.isArray(l) ? l : []).catch(() => []);
+        const minimizada = lista.find(j => semAcento(j.titulo).includes(procura)) || lista.find(j => combina(j.titulo));
+        if (minimizada && (await escondeJanela(minimizada.hwnd))) {
+            await new Promise(r => setTimeout(r, 700));
+            achada = await procuraFonte();
+            if (achada) return { id: achada.id, nome: achada.name, escondida: true };
+        }
+    }
+    // Aba de trás: o navegador não desenha ela. Se ele mesmo pôs o vídeo no picture-in-picture (troca de aba),
+    // a janelinha dele é só o vídeo: captura ela inteira. Senão, avisa que o vídeo está numa aba fechada
+    const abas = await janelaVideo(['-Acao', 'abas']).then(l => Array.isArray(l) ? l : []).catch(() => []);
+    const aba = abas.find(a => semAcento(a.aba).includes(procura));
+    if (!aba) return null;
+    if (/picture.in.picture/.test(semAcento(aba.aba))) {
+        const fontes = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false });
+        const pip = fontes.find(f => !minhas.has(janelaDe(f.id)) && /^picture.in.picture$/.test(semAcento(f.name)));
+        if (pip) return { id: pip.id, nome: pip.name, pip: true };
+    }
+    return { emAba: true };
+});
+// Devolve as janelas escondidas (vídeo fechado, imagem parada, Red Code saindo): voltam ao lugar, minimizadas
+ipcMain.handle('painel:clipe-devolve', (ev, id) => { if (paginaDoPainel(ev.sender)) devolveJanelas(id ? Number(String(id).split(':')[1]) : 0); return true; });
+// Onde está o <video> dentro da janela capturada (UI Automation do Windows, via janela-video.ps1 -Acao player):
+// um vigia por janela, que lê a cada 1,5 s; a página pergunta e recebe a última posição (fração da janela) ou null.
+// Sem pergunta por 10 s, o vigia é desligado.
+const vigiasPlayer = new Map();   // hwnd -> { processo, area, perguntadoEm }
+ipcMain.handle('painel:clipe-player', (ev, id) => {
+    if (!paginaDoPainel(ev.sender) || process.platform !== 'win32') return null;
+    const hwnd = Number(String(id || '').split(':')[1]);
+    if (!hwnd) return null;
+    let v = vigiasPlayer.get(hwnd);
+    if (!v) {
+        const processo = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(PASTA, 'janela-video.ps1'), '-Acao', 'player', '-Hwnd', String(hwnd), '-Pai', String(process.pid)], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+        v = { processo, area: null, perguntadoEm: Date.now() };
+        vigiasPlayer.set(hwnd, v);
+        let resto = '';
+        processo.stdout.setEncoding('utf8');
+        processo.stdout.on('data', (pedaco) => {
+            const linhas = (resto + pedaco).split(/\r?\n/);
+            resto = linhas.pop();
+            for (const linha of linhas) { try { const o = JSON.parse(linha); v.area = o && o.w > 0 ? { x: o.x, y: o.y, w: o.w, h: o.h } : null; v.lido = true; } catch (e) { /* linha incompleta */ } }
+        });
+        processo.on('exit', () => { if (vigiasPlayer.get(hwnd) === v) vigiasPlayer.delete(hwnd); });
+        processo.on('error', () => { if (vigiasPlayer.get(hwnd) === v) vigiasPlayer.delete(hwnd); });
+    }
+    v.perguntadoEm = Date.now();
+    // Antes da 1ª leitura: "lendo" (a página espera em vez de cair no detector de imagem)
+    return v.lido ? v.area : 'lendo';
+});
+setInterval(() => {
+    for (const [hwnd, v] of vigiasPlayer) if (Date.now() - v.perguntadoEm > 10000) { try { v.processo.kill(); } catch (e) { /* já saiu */ } vigiasPlayer.delete(hwnd); }
+}, 5000).unref();
+// janela-video.ps1: lista as minimizadas, esconde fora da tela (e vigia se a pessoa abrir) e devolve
+const escondidas = new Map();   // hwnd -> { processo, posicao }
+function janelaVideo(args) {
+    return new Promise((resolve, rejeita) => {
+        execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(PASTA, 'janela-video.ps1'), ...args], { windowsHide: true, timeout: 15000 }, (erro, saida) => {
+            if (erro) return rejeita(erro);
+            try { resolve(JSON.parse(String(saida).trim().split(/\r?\n/)[0] || 'null')); } catch (e) { rejeita(e); }
+        });
+    });
+}
+function escondeJanela(hwnd) {
+    if (process.platform !== 'win32') return Promise.resolve(false);
+    if (escondidas.has(hwnd)) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        const processo = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(PASTA, 'janela-video.ps1'), '-Acao', 'esconde', '-Hwnd', String(hwnd), '-Pai', String(process.pid)], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+        let resto = '', respondeu = false;
+        processo.stdout.setEncoding('utf8');
+        processo.stdout.on('data', (pedaco) => {
+            const linhas = (resto + pedaco).split(/\r?\n/);
+            resto = linhas.pop();
+            for (const linha of linhas) {
+                let o; try { o = JSON.parse(linha); } catch (e) { continue; }
+                // 1ª linha: a posição original (para devolver); "voltou": a pessoa abriu a janela, não mexe mais
+                if (!respondeu) { respondeu = true; if (o.erro) return resolve(false); escondidas.set(hwnd, { processo, posicao: o }); soltaGuarda(hwnd, o); resolve(true); }
+                else if (o.voltou) escondidas.delete(hwnd);
+            }
+        });
+        processo.on('exit', () => { const e = escondidas.get(hwnd); if (e && e.processo === processo && !e.devolvendo) escondidas.delete(hwnd); if (!respondeu) resolve(false); });
+        processo.on('error', () => { if (!respondeu) resolve(false); });
+    });
+}
+// Guarda solto (por meio do start: fora do Red Code, que leva junto os processos filhos quando cai ou é encerrado):
+// se o Red Code sumir com a janela ainda fora da tela, ela volta ao lugar, minimizada
+function soltaGuarda(hwnd, p) {
+    spawn('cmd.exe', ['/c', 'start', '""', '/min', 'powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', path.join(PASTA, 'janela-video.ps1'),
+        '-Acao', 'guarda', '-Hwnd', String(hwnd), '-X', String(p.x), '-Y', String(p.y), '-L', String(p.l), '-A', String(p.a), '-Pai', String(process.pid)], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+}
+function devolveJanelas(so) {
+    for (const [hwnd, e] of escondidas) {
+        if (so && hwnd !== so) continue;
+        e.devolvendo = true;
+        try { e.processo.kill(); } catch (x) { /* já saiu */ }
+        const p = e.posicao;
+        janelaVideo(['-Acao', 'devolve', '-Hwnd', String(hwnd), '-X', String(p.x), '-Y', String(p.y), '-L', String(p.l), '-A', String(p.a)]).catch(() => { });
+        escondidas.delete(hwnd);
+    }
+}
+// Janela desanexada: a altura acompanha a proporção do recorte (a largura fica)
+ipcMain.handle('painel:clipe-proporcao', (ev, r) => {
+    const w = BrowserWindow.fromWebContents(ev.sender);
+    if (!w || !janelasClipe.has(w) || !(r > 0.2 && r < 6)) return false;
+    // Mantém a largura e o canto de baixo (a janela cresce ou encolhe para cima)
+    const b = w.getBounds();
+    const altura = Math.max(108, Math.round(b.width / r));
+    w.setAspectRatio(r);
+    w.setBounds({ x: b.x, y: b.y + b.height - altura, width: b.width, height: altura });
+    return true;
+});
+function ajustaJanelaClipe(w) {
+    janelasClipe.add(w);
+    w.on('closed', () => janelasClipe.delete(w));
+    // Acima de tudo, até de janela em tela cheia
+    w.setAlwaysOnTop(true, 'floating');
+    w.setAspectRatio(16 / 9);
+}
 
 // ---------- Ícone do Red Code: estrela de raios vermelha (desenhada em código) ----------
 // Raios em cápsula saindo do centro, com comprimentos irregulares; 4x4 amostras por pixel (bordas lisas)
@@ -650,6 +809,8 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
     saindo = true; guardaJanela();
+    // Janela do vídeo escondida fora da tela: volta ao lugar, minimizada
+    devolveJanelas();
     // Versão nova baixada (exe): troca a pasta do programa assim que tudo fechar
     if (atualizacaoPronta) { atualizacao.aplicaAoSair(atualizacaoPronta, path.dirname(process.execPath), process.execPath, reabrirAposAtualizar, PASTA_DADOS); atualizacaoPronta = null; }
     // Pelo código: "Reiniciar" do cartão reabre o app (e o git pull roda ao abrir)

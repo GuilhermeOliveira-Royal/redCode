@@ -18,4 +18,12 @@ contextBridge.exposeInMainWorld('painelDesktop', {
         acao: (acao) => ipcRenderer.invoke('painel:atualizacao-acao', String(acao)),
         aoMudar: (fn) => ipcRenderer.on('painel:atualizacao', (ev, estado) => fn(estado)),
     },
+    // Vídeo da mídia que está tocando: acha a janela de onde vem o som e ajusta a janela desanexada ao recorte
+    clipe: {
+        fonte: (titulo, podeEsconder, app) => ipcRenderer.invoke('painel:clipe-fonte', String(titulo || ''), podeEsconder !== false, String(app || '')),
+        devolve: (id) => ipcRenderer.invoke('painel:clipe-devolve', id ? String(id) : ''),
+        proporcao: (r) => ipcRenderer.invoke('painel:clipe-proporcao', Number(r) || 0),
+        // Posição do <video> dentro da janela capturada (UI Automation), ou null
+        player: (id) => ipcRenderer.invoke('painel:clipe-player', String(id || '')),
+    },
 });

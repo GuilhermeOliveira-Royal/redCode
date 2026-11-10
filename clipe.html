@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>V&iacute;deo &middot; Red Code</title>
+<style>
+/* Video desanexado: janela sem moldura, sempre por cima (o Red Code abre assim pelo botao do quadrinho do canto) */
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: #f3eee9; font: 12px/1.35 "Segoe UI", system-ui, sans-serif; }
+.clipe-tela { position: absolute; inset: 0; overflow: hidden; }
+.clipe-tela video { position: absolute; }
+.clipe-aviso { position: absolute; inset: 0; display: grid; place-items: center; padding: 34px 18px 14px; text-align: center; color: #c9beb5; background: #000c; overflow-wrap: anywhere; }
+.clipe-procurando .clipe-aviso { top: auto; padding: 16px 10px 7px; font-size: 11px; background: linear-gradient(#0000, #000b); }
+.barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 6px 6px 18px 10px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .2s; -webkit-app-region: drag; }
+body:hover .barra, body.clipe-com-aviso .barra { opacity: 1; }
+.barra .nome { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+.barra button { -webkit-app-region: no-drag; display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #fff; cursor: pointer; }
+.barra button:hover { background: #ffffff2b; }
+.barra button.ligado { background: #ffffff38; }
+/* Arrastar a janela por qualquer ponto (o video e so imagem: nao recebe clique) */
+.arrasta { position: absolute; inset: 0; -webkit-app-region: drag; }
+</style>
+</head>
+<body>
+<div class="clipe-tela"></div>
+<div class="arrasta"></div>
+<div class="clipe-aviso" hidden></div>
+<div class="barra">
+    <span class="nome" id="nome"></span>
+    <button type="button" id="inteira" title="Mostrar a janela inteira" aria-label="Mostrar a janela inteira"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.5V2.5h3M14 5.5V2.5h-3M2 10.5v3h3M14 10.5v3h-3"/></svg></button>
+    <button type="button" id="anexar" title="Voltar para o canto do Red Code" aria-label="Voltar para o canto do Red Code"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.6"/><rect x="2.8" y="8.6" width="5.6" height="3.6" rx=".8" fill="currentColor" stroke="none"/></svg></button>
+    <button type="button" id="fechar" title="Fechar o v&iacute;deo" aria-label="Fechar o v&iacute;deo"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+</div>
+<script src="/clipe.js"></script>
+<script>
+// Fala com a janela principal pelo BroadcastChannel: "anexar" volta o video para o canto do Red Code
+const canal = new BroadcastChannel('redcode-clipe');
+const nome = document.getElementById('nome');
+const botaoInteira = document.getElementById('inteira');
+const clipe = ClipeMusica(document.body, {
+    inteira: new URLSearchParams(location.search).get('inteira') === '1',
+    aoEstado: (estado) => document.body.classList.toggle('clipe-com-aviso', !!estado && estado !== 'procurando'),
+    aoProporcao: (r) => { if (window.painelDesktop && window.painelDesktop.clipe) window.painelDesktop.clipe.proporcao(r); },
+});
+botaoInteira.classList.toggle('ligado', clipe.inteira());
+async function le() {
+    try {
+        const r = await fetch('/api/midia', { headers: { 'X-Painel': '1' } });
+        const m = await r.json();
+        clipe.atualiza(m);
+        if (m && m.titulo) { nome.textContent = m.titulo + (m.artista ? ' \u00b7 ' + m.artista : ''); }
+    } catch (e) { /* servidor reiniciando */ }
+}
+setInterval(le, 2000);
+le();
+botaoInteira.addEventListener('click', () => {
+    const ligada = clipe.alternaInteira();
+    botaoInteira.classList.toggle('ligado', ligada);
+    botaoInteira.title = ligada ? 'Mostrar s\u00f3 o v\u00eddeo' : 'Mostrar a janela inteira';
+});
+document.getElementById('anexar').addEventListener('click', () => { canal.postMessage({ tipo: 'anexar', inteira: clipe.inteira() }); window.close(); });
+document.getElementById('fechar').addEventListener('click', () => { canal.postMessage({ tipo: 'fechar' }); window.close(); });
+canal.postMessage({ tipo: 'desanexou' });
+</script>
+</body>
+</html>

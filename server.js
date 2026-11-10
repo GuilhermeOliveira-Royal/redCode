@@ -27,6 +27,23 @@ function nomeUsuario() {
 }
 const cacheComandos = new Map();
 const cacheUso = { dados: null, em: 0, pedido: null };
+const cacheModelos = { dados: null, em: 0, pedido: null };
+// Lista do supportedModels() -> { modelos: [{ id, nome, descricao, familia, esforcos, principal }] }
+// id = o nome completo (claude-fable-5-2), que é o que a conversa grava; "default" (o padrão da conta) fica de fora
+function organizaModelos(lista) {
+    const versao = (id) => { const m = String(id).match(/^claude-[a-z]+-(\d+)(?:-(\d{1,2}))?(?:-|$)/); return m ? Number(m[1]) * 100 + Number(m[2] || 0) : 0; };
+    const vistos = new Set(), modelos = [];
+    for (const m of lista || []) {
+        const id = m.resolvedModel || m.value;
+        if (m.value === 'default' || !/^claude-[a-z]+-\d/.test(id) || vistos.has(id)) continue;
+        vistos.add(id);
+        modelos.push({ id, nome: m.displayName || id, descricao: m.description || '', familia: id.split('-')[1], versao: versao(id), esforcos: m.supportedEffortLevels || [] });
+    }
+    const maisNova = {};
+    for (const m of modelos) if (!maisNova[m.familia] || m.versao > maisNova[m.familia]) maisNova[m.familia] = m.versao;
+    for (const m of modelos) { m.principal = m.versao === maisNova[m.familia]; delete m.versao; }
+    return { modelos, lidoEm: new Date().toISOString() };
+}
 
 const PORTA = Number(process.env.PAINEL_PORTA || 4317);
 // Pasta do Claude do perfil ativo (CLAUDE_CONFIG_DIR vem do perfil; no padrão é ~/.claude)
@@ -1887,9 +1904,9 @@ async function rotaChat(req, res, url) {
                 if (!pastaConhecida(cwd)) return responde(res, 403, { erro: 'Pasta de projeto desconhecida.' });
                 const q = (k) => url.searchParams.get(k);
                 if (url.pathname === '/api/git/estado') return responde(res, 200, await gitScm.estado(cwd));
-                if (url.pathname === '/api/git/diff') return responde(res, 200, { diff: await gitScm.diff(cwd, q('arquivo'), q('staged') === '1') });
+                if (url.pathname === '/api/git/diff') return responde(res, 200, { diff: await gitScm.diff(cwd, q('arquivo'), q('staged') === '1', q('inteiro') === '1') });
                 if (url.pathname === '/api/git/log') return responde(res, 200, await gitScm.log(cwd, q('n')));
-                if (url.pathname === '/api/git/commit') return responde(res, 200, q('arquivo') ? { diff: await gitScm.commit(cwd, q('hash'), q('arquivo')) } : await gitScm.commit(cwd, q('hash')));
+                if (url.pathname === '/api/git/commit') return responde(res, 200, q('arquivo') ? { diff: await gitScm.commit(cwd, q('hash'), q('arquivo'), q('inteiro') === '1') } : await gitScm.commit(cwd, q('hash')));
                 if (url.pathname === '/api/git/branches') return responde(res, 200, await gitScm.branches(cwd));
                 if (url.pathname === '/api/git/a-subir') return responde(res, 200, { commits: await gitScm.aSubir(cwd), hooks: await gitScm.hooksComEfeito(cwd) });
                 if (url.pathname === '/api/git/hooks') return responde(res, 200, { hooks: await gitScm.hooksComEfeito(cwd) });
@@ -2434,6 +2451,10 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600', 'X-Content-Type-Options': 'nosniff' });
             return res.end(capa);
         }
+        if (url.pathname === '/clipe.html' || url.pathname === '/clipe.js') {
+            res.writeHead(200, { 'Content-Type': url.pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+            return res.end(fs.readFileSync(path.join(__dirname, url.pathname.slice(1))));
+        }
         // Mascotes dos agentes: o visual de cada um (Configurações › Regras e agentes › Personalizar)
         if (url.pathname === '/api/visual-pets') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
@@ -2467,6 +2488,19 @@ const servidor = http.createServer(async (req, res) => {
             if (req.method === 'GET') return responde(res, 200, midia.le());
             try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
+        // Modelos que a conta pode usar (lista do Claude Code, atualiza quando a Anthropic lança um modelo).
+        // principal = a versão mais nova de cada família (Opus, Fable, Sonnet, Haiku); o resto é "versões anteriores"
+        if (url.pathname === '/api/modelos-claude') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            const vencido = !cacheModelos.dados || Date.now() - cacheModelos.em > 6 * 3600e3 || (url.searchParams.has('atualizar') && Date.now() - cacheModelos.em > 60000);
+            if (vencido) {
+                if (!cacheModelos.pedido) cacheModelos.pedido = chat.modelosDisponiveis().then((lista) => { cacheModelos.dados = organizaModelos(lista); cacheModelos.em = Date.now(); })
+                    .catch((e) => { if (!cacheModelos.dados) cacheModelos.dados = { erro: e.message, modelos: [] }; cacheModelos.em = Date.now() - 6 * 3600e3 + 120000; })
+                    .finally(() => { cacheModelos.pedido = null; });
+                await cacheModelos.pedido;
+            }
+            return responde(res, 200, cacheModelos.dados);
         }
         if (url.pathname === '/api/uso') {
             const agora = Date.now();
