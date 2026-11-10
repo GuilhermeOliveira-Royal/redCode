@@ -1651,9 +1651,46 @@ body.lista-escondida .rodape-sessoes { display: none; }
 /* Vídeo da mídia no canto (como o picture-in-picture do navegador): em cima do player, tamanho P/M/G ou pela alça */
 .pip-clipe { position: fixed; left: 10px; bottom: 150px; z-index: 44; width: 300px; aspect-ratio: var(--pip-prop, 1.7778); overflow: hidden; border-radius: 12px; background: #000; border: 1px solid var(--linha); box-shadow: 0 14px 36px rgba(0, 0, 0, .5); animation: playerEntra .3s cubic-bezier(.2, .8, .2, 1); }
 .pip-clipe .clipe-tela { position: absolute; inset: 0; overflow: hidden; }
-.pip-clipe .clipe-tela video { position: absolute; }
+.pip-clipe .clipe-tela iframe, .pip-clipe .clipe-tela video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; background: #000; pointer-events: none; }
+.pip-clipe .clipe-aviso .instalar-extensao { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
+.pip-clipe .clipe-aviso .mini { margin-left: 6px; padding: 2px 8px; border: 1px solid #fff6; border-radius: 6px; color: #fff; }
 .pip-clipe .clipe-aviso { position: absolute; inset: 0; display: grid; place-items: center; padding: 32px 14px 10px; text-align: center; font-size: 12px; line-height: 1.35; color: #d8cfc7; background: #000c; overflow-wrap: anywhere; }
-.pip-clipe.clipe-procurando .clipe-aviso { top: auto; padding: 14px 8px 6px; font-size: 11px; background: linear-gradient(#0000, #000b); }
+/* Carregando: o pet no meio, sobre o preto */
+.pip-clipe.clipe-carregando .clipe-aviso { padding: 10px; background: #000; }
+.pip-clipe .pet-video .pet-nome { color: #d8cfc7; max-width: none; }
+/* Pet de carregando comendo pipoca: mastiga, balde listrado do lado e grãos voando do balde até a boca */
+.pet-video .pet-corpo { animation: petMastiga .6s ease-in-out infinite; }
+.pet-video .pet-boca { position: absolute; left: 50%; bottom: 6px; width: 8px; height: 4px; margin-left: -4px; border-radius: 0 0 5px 5px; background: #1b1b1b; animation: petBoca .6s ease-in-out infinite; }
+.pet-video .pet-balde { position: absolute; right: -17px; bottom: -3px; animation: petBalde 1.8s ease-in-out infinite; }
+.pet-video .pet-grao { position: absolute; right: -11px; top: 2px; width: 5px; height: 5px; border-radius: 50%; background: #fff8e2; box-shadow: 1px 1px 0 #f0c96a inset; opacity: 0; animation: petGrao 1.8s ease-in infinite; }
+.pet-video .pet-grao.g2 { animation-delay: .6s; }
+.pet-video .pet-grao.g3 { animation-delay: 1.2s; }
+@keyframes petMastiga { 0%, 100% { transform: scale(1.05, .95); } 50% { transform: scale(.97, 1.04) translateY(-2px); } }
+@keyframes petBoca { 0%, 100% { height: 4px; } 50% { height: 1.5px; } }
+@keyframes petBalde { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-8deg); } }
+@keyframes petGrao { 0% { opacity: 0; transform: translate(0, 0) scale(.7); } 15% { opacity: 1; transform: translate(-4px, -12px) scale(1); } 60% { opacity: 1; transform: translate(-17px, -6px); } 75%, 100% { opacity: 0; transform: translate(-21px, 8px) scale(.6); } }
+/* Encaixado na lateral, logo acima do player: entra crescendo e empurra a lista de conversas para cima */
+.pip-clipe.no-canto { position: relative; left: auto; bottom: auto; z-index: auto; width: 100%; box-sizing: border-box; max-height: 0; margin: 0 0 0; box-shadow: none; animation: none; opacity: 0; transform: translateY(10px); transition: max-height .45s cubic-bezier(.2, .8, .2, 1), margin .45s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
+.pip-clipe.no-canto.aberto { margin-bottom: 8px; opacity: 1; transform: none; }
+.pip-clipe.no-canto [data-pip-tamanho], .pip-clipe.no-canto .pip-alca, .pip-clipe.no-canto [data-pip="encaixar"] { display: none; }
+/* Encaixado: alça no canto de baixo à direita para diminuir/aumentar ali mesmo (o canto de cima à esquerda fica parado) */
+.pip-clipe .pip-alca-canto { display: none; position: absolute; right: 0; bottom: 0; z-index: 1; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; }
+.pip-clipe.no-canto .pip-alca-canto { display: block; }
+.pip-clipe .pip-alca-canto::after { content: ""; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px; border-bottom: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 0 3px 0; opacity: 0; transition: opacity .18s; }
+.pip-clipe:hover .pip-alca-canto::after { opacity: 1; }
+.pip-clipe.no-canto.redimensionando { transition: none; }
+/* Arrastado para fora do canto: flutua onde a pessoa soltar, com tamanho P/M/G ou pela alça */
+.pip-clipe { cursor: grab; touch-action: none; }
+.pip-clipe.arrastando { cursor: grabbing; user-select: none; transition: none !important; box-shadow: 0 18px 44px rgba(0, 0, 0, .6); }
+.pip-clipe.pequeno [data-pip-tamanho], .pip-clipe.pequeno .pip-vao { display: none; }
+.pip-clipe.pequeno .pip-barra { justify-content: flex-end; padding: 3px 14px 10px 3px; }
+.pip-clipe.pequeno .pip-barra button { min-width: 20px; height: 20px; padding: 0 3px; }
+.pip-clipe.pequeno .clipe-aviso { padding: 4px; font-size: 10px; line-height: 1.25; }
+.pip-clipe.pequeno .pet-video { transform: scale(.7); }
+.pip-clipe.pequeno .pet-video .pet-nome { display: none; }
+.pip-clipe.flutuando { position: fixed; z-index: 44; bottom: auto; max-height: none !important; margin: 0; opacity: 1; transform: none; box-shadow: 0 14px 36px rgba(0, 0, 0, .5); }
+/* Soltando em cima do player: o canto acende para mostrar que volta a encaixar */
+.rodape-sessoes.vai-encaixar .player-midia { outline: 2px dashed var(--voce); outline-offset: 3px; }
 .pip-clipe .pip-barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 5px 18px 16px 5px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .18s; }
 .pip-clipe:hover .pip-barra, .pip-clipe.clipe-com-aviso .pip-barra { opacity: 1; }
 .pip-clipe .pip-barra button { display: grid; place-items: center; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 7px; color: #fff; font: 600 11px/1 var(--sans); }
@@ -1665,7 +1702,8 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe:hover .pip-alca::after { opacity: 1; }
 .pip-clipe.redimensionando { user-select: none; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
-body.com-player .uso-plano:not(.minimizado) { bottom: 116px; }
+/* Com o vídeo encaixado acima do player, o cartão de uso sobe junto */
+body.com-player .uso-plano:not(.minimizado) { bottom: calc(116px + var(--altura-video, 0px)); transition: bottom .45s cubic-bezier(.2, .8, .2, 1); }
 .chip-perfil .perfil-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-perfil .perfil-seta { color: var(--atencao); white-space: nowrap; }
 .chip-perfil.pendente { border-color: var(--atencao); animation: perfilPisca 1.6s ease-in-out infinite; }
@@ -2636,8 +2674,8 @@ const ICONE_MIDIA = {
     proxima: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2.5 3.2v9.6c0 .5.5.8.9.5L10 8.5a.6.6 0 0 0 0-1L3.4 2.7c-.4-.3-.9 0-.9.5z"/><rect x="11.2" y="2.6" width="2.3" height="10.8" rx=".9"/></svg>',
     nota: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 12.2a2 2 0 1 1-1.2-1.8V3.6l7.5-1.5v8.1a2 2 0 1 1-1.2-1.8V4.1L6 5.1z"/></svg>',
     video: '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2"/><path d="M6.6 6v4l3.6-2z" fill="currentColor"/></svg>',
-    inteira: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5.5V2.5h3M14 5.5V2.5h-3M2 10.5v3h3M14 10.5v3h-3"/></svg>',
     soltar: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 8 8"/><path d="M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg>',
+    encaixar: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.6"/><rect x="2.8" y="8.6" width="5.6" height="3.6" rx=".8" fill="currentColor" stroke="none"/></svg>',
     fechar: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
 };
 let midiaAtual = null, capaMostrada = -1, semMidiaDesde = 0;
@@ -2754,8 +2792,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) atua
 setTimeout(atualizaMidia, 0);
 
 /* ---------- Vídeo da mídia no canto (como o picture-in-picture do navegador) ---------- */
-// Captura a janela de onde vem o som e mostra só a área do vídeo (clipe.js); só no app desktop
-const SUPORTA_CLIPE = !!(window.painelDesktop && window.painelDesktop.clipe && window.ClipeMusica) && !JANELA_SECUNDARIA;
+// A extensão do navegador diz qual vídeo do YouTube toca e em que segundo; o clipe.js toca uma cópia muda dele
+const SUPORTA_CLIPE = !!window.ClipeMusica && !JANELA_SECUNDARIA;
 const SO_AUDIO = /spotify|deezer|tidal|amazonmusic|applemusic|zunemusic/i;
 let pip = null, clipePip = null;
 function abrePip() {
@@ -2768,46 +2806,91 @@ function abrePip() {
         pip.innerHTML = `<div class="clipe-tela"></div>
             <div class="clipe-aviso" hidden></div>
             <div class="pip-barra">
-                <button type="button" data-pip-tamanho="240" title="Pequeno">P</button>
+                <button type="button" data-pip-tamanho="150" title="Pequeno">P</button>
                 <button type="button" data-pip-tamanho="360" title="Médio">M</button>
                 <button type="button" data-pip-tamanho="520" title="Grande">G</button>
                 <span class="pip-vao"></span>
-                <button type="button" data-pip="inteira" title="Mostrar a janela inteira" aria-label="Mostrar a janela inteira">${ICONE_MIDIA.inteira}</button>
+                <button type="button" data-pip="encaixar" title="Encaixar de volta acima do player" aria-label="Encaixar de volta">${ICONE_MIDIA.encaixar}</button>
                 <button type="button" data-pip="soltar" title="Desanexar: janela própria, sempre por cima das outras" aria-label="Desanexar">${ICONE_MIDIA.soltar}</button>
                 <button type="button" data-pip="fechar" title="Fechar o vídeo" aria-label="Fechar o vídeo">${ICONE_MIDIA.fechar}</button>
             </div>
-            <span class="pip-alca" title="Arraste para mudar o tamanho"></span>`;
-        document.body.appendChild(pip);
+            <span class="pip-alca" title="Arraste para mudar o tamanho"></span>
+            <span class="pip-alca-canto" title="Arraste para diminuir ou aumentar"></span>`;
+        // No rodapé da lateral, logo acima do player (a lista de conversas encolhe para dar lugar)
+        pip.classList.add('no-canto');
+        document.getElementById('rodapeSessoes').insertBefore(pip, playerMidia);
         ligaPip();
     }
+    if (lePref('clipeFlutua', '') === '1') modoPip(true);
     if (!clipePip) clipePip = ClipeMusica(pip, {
-        inteira: lePref('clipeInteira', '') === '1',
-        aoProporcao: (r) => { pip.style.setProperty('--pip-prop', r.toFixed(4)); posicionaPip(); },
+        confirma: (titulo, texto) => confirmaNaPagina(titulo, `<p>${esc(texto)}</p>`, 'Instalar e reabrir'),
+        aoProporcao: (r) => { pip.style.setProperty('--pip-prop', r.toFixed(4)); if (pip.classList.contains('flutuando')) posicionaPip(); else if (pip.classList.contains('aberto')) mostraPip(true); },
     });
-    marcaInteira();
     atualizaPip();
 }
 function fechaPip(lembrar) {
     if (clipePip) { clipePip.destroi(); clipePip = null; }
-    if (pip) pip.hidden = true;
+    mostraPip(false);
     if (lembrar) gravaPref('clipe', '');
 }
-function marcaInteira() {
-    const b = pip && pip.querySelector('[data-pip="inteira"]');
-    if (!b || !clipePip) return;
-    const ligada = clipePip.inteira();
-    b.classList.toggle('ligado', ligada);
-    b.title = ligada ? 'Mostrar só o vídeo' : 'Mostrar a janela inteira';
+// Abre crescendo (a altura vai de 0 até a do vídeo) e fecha encolhendo; a lista acima acompanha
+function mostraPip(mostrar) {
+    if (!pip) return;
+    const altura = () => Math.round(pip.offsetWidth / (parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9));
+    if (pip.classList.contains('flutuando')) { pip.hidden = !mostrar; if (mostrar) { pip.classList.add('aberto'); posicionaPip(); } return; }
+    if (mostrar) {
+        aplicaLarguraCanto();
+        if (pip.hidden) { pip.hidden = false; pip.style.maxHeight = '0px'; void pip.offsetHeight; }
+        pip.classList.add('aberto');
+        pip.style.maxHeight = altura() + 'px';
+        document.body.style.setProperty('--altura-video', (altura() + 8) + 'px');
+    } else if (!pip.hidden) {
+        pip.classList.remove('aberto');
+        document.body.style.setProperty('--altura-video', '0px');
+        pip.style.maxHeight = '0px';
+        clearTimeout(pip.__fecha);
+        pip.__fecha = setTimeout(() => { if (!pip.classList.contains('aberto')) pip.hidden = true; }, 460);
+    }
+}
+// Largura de dentro da lateral (sem o espaçamento dela): o máximo do vídeo encaixado
+function larguraLivreCanto() {
+    const pai = pip && pip.parentElement;
+    if (!pai) return 0;
+    const e = getComputedStyle(pai);
+    return pai.clientWidth - parseFloat(e.paddingLeft) - parseFloat(e.paddingRight);
+}
+// Encaixado: a largura escolhida pela alça (vazio = a lateral toda); bem pequeno usa a barra enxuta
+function aplicaLarguraCanto() {
+    if (!pip || !pip.classList.contains('no-canto')) return;
+    const escolhida = Number(lePref('clipeLarguraCanto', '')) || 0;
+    const cabe = larguraLivreCanto();
+    const largura = escolhida && cabe ? Math.max(112, Math.min(escolhida, cabe)) : 0;
+    pip.style.width = largura && largura < cabe ? largura + 'px' : '';
+    pip.classList.toggle('pequeno', !!largura && largura < 220);
 }
 // Em cima do player, alinhado com ele; a largura escolhida diminui se não couber na janela
 function posicionaPip() {
-    if (!pip || pip.hidden) return;
-    const r = playerMidia.getBoundingClientRect();
-    if (r.height) { pip.style.left = Math.round(r.left) + 'px'; pip.style.bottom = Math.round(innerHeight - r.top + 8) + 'px'; }
+    if (!pip || pip.hidden || !pip.classList.contains('flutuando')) return;
+    // Flutuando: largura escolhida (P/M/G ou alça) e posição dentro da janela
     const proporcao = parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9;
-    const esquerda = parseFloat(pip.style.left) || 10, baixo = parseFloat(pip.style.bottom) || 150;
-    const maxima = Math.max(200, Math.min(innerWidth - esquerda - 12, (innerHeight - baixo - 12) * proporcao));
-    pip.style.width = Math.round(Math.min(Number(lePref('clipeLargura', '300')) || 300, maxima)) + 'px';
+    const largura = Math.round(Math.max(112, Math.min(Number(lePref('clipeLargura', '360')) || 360, innerWidth - 24, (innerHeight - 24) * proporcao)));
+    pip.style.width = largura + 'px';
+    // Bem pequeno: a barra fica só com encaixar, desanexar e fechar; pet e avisos menores
+    pip.classList.toggle('pequeno', largura < 220);
+    const altura = largura / proporcao;
+    const x = Math.max(8, Math.min(Number(lePref('clipeX', '')) || (innerWidth - largura - 24), innerWidth - largura - 8));
+    const y = Math.max(8, Math.min(Number(lePref('clipeY', '')) || (innerHeight - altura - 24), innerHeight - altura - 8));
+    pip.style.left = Math.round(x) + 'px';
+    pip.style.top = Math.round(y) + 'px';
+}
+// Encaixado acima do player (a lista sobe) ou flutuando na janela; a escolha fica guardada
+function modoPip(flutuando) {
+    if (!pip) return;
+    gravaPref('clipeFlutua', flutuando ? '1' : '');
+    pip.classList.toggle('no-canto', !flutuando);
+    pip.classList.toggle('flutuando', flutuando);
+    if (flutuando) { pip.style.maxHeight = ''; document.body.style.setProperty('--altura-video', '0px'); posicionaPip(); }
+    else { pip.style.left = pip.style.top = pip.style.width = ''; pip.classList.remove('pequeno'); mostraPip(true); }
 }
 // A cada leitura do player: reabre se estava no canto, passa a música e some junto com o player
 function atualizaPip() {
@@ -2815,24 +2898,78 @@ function atualizaPip() {
     const m = midiaAtual, valida = m && !m.nada && !m.erro && m.titulo;
     if (valida && !clipePip && lePref('clipe', '') === 'canto' && !SO_AUDIO.test(m.app || '')) return abrePip();
     if (clipePip && valida) clipePip.atualiza(m);
-    if (pip) pip.hidden = !clipePip || playerMidia.hidden;
-    posicionaPip();
+    mostraPip(!!clipePip && !playerMidia.hidden);
 }
 function ligaPip() {
     pip.addEventListener('click', (ev) => {
         const tamanho = ev.target.closest('[data-pip-tamanho]');
         if (tamanho) { gravaPref('clipeLargura', tamanho.dataset.pipTamanho); return posicionaPip(); }
+        if (pip.__arrastou) { pip.__arrastou = false; return; }
         const b = ev.target.closest('[data-pip]');
         if (!b || !clipePip) return;
         if (b.dataset.pip === 'fechar') { fechaPip(true); return desenhaMidia(); }
-        if (b.dataset.pip === 'inteira') { gravaPref('clipeInteira', clipePip.alternaInteira() ? '1' : ''); return marcaInteira(); }
+        if (b.dataset.pip === 'encaixar') return modoPip(false);
         if (b.dataset.pip === 'soltar') {
             // Janela própria, sem moldura e sempre por cima (desktop/main.js); o canto fecha até ela pedir para voltar
-            window.open('/clipe.html' + (clipePip.inteira() ? '?inteira=1' : ''), 'clipeRedCode', 'popup');
+            window.open('/clipe.html', 'clipeRedCode', 'popup');
             fechaPip(false);
             gravaPref('clipe', 'solto');
             desenhaMidia();
         }
+    });
+    pip.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-canto, .clipe-aviso button')) return;
+        const r0 = pip.getBoundingClientRect();
+        const dx = ev.clientX - r0.left, dy = ev.clientY - r0.top, x0 = ev.clientX, y0 = ev.clientY;
+        let movendo = false;
+        const rodape = document.getElementById('rodapeSessoes');
+        const emCimaDoPlayer = (e) => { const r = playerMidia.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 20 && e.clientY <= r.bottom + 10; };
+        const mexe = (e) => {
+            if (!movendo) {
+                if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return;
+                movendo = true;
+                pip.setPointerCapture(ev.pointerId);
+                pip.classList.add('arrastando');
+                // Saindo do canto: guarda o tamanho de agora e passa a flutuar a partir de onde estava
+                if (!pip.classList.contains('flutuando')) { gravaPref('clipeLargura', String(Math.round(Math.max(r0.width, 300)))); modoPip(true); }
+            }
+            gravaPref('clipeX', String(Math.round(e.clientX - dx)));
+            gravaPref('clipeY', String(Math.round(e.clientY - dy)));
+            posicionaPip();
+            rodape.classList.toggle('vai-encaixar', emCimaDoPlayer(e));
+        };
+        const solta = (e) => {
+            pip.removeEventListener('pointermove', mexe);
+            pip.classList.remove('arrastando');
+            rodape.classList.remove('vai-encaixar');
+            if (!movendo) return;
+            pip.__arrastou = true;
+            if (emCimaDoPlayer(e)) modoPip(false);
+        };
+        pip.addEventListener('pointermove', mexe);
+        pip.addEventListener('pointerup', solta, { once: true });
+        pip.addEventListener('pointercancel', solta, { once: true });
+    });
+    // Encaixado: alça no canto de baixo à direita; para a esquerda ou para cima diminui, o vídeo continua acima do player
+    const alcaCanto = pip.querySelector('.pip-alca-canto');
+    alcaCanto.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        alcaCanto.setPointerCapture(ev.pointerId);
+        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
+        const cabe = larguraLivreCanto();
+        pip.classList.add('redimensionando');
+        const mexe = (e) => {
+            // Vale o movimento maior: o de lado ou o de cima/baixo (convertido em largura pela proporção do vídeo)
+            const dx = e.clientX - x0, dy = (e.clientY - y0) * proporcao;
+            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
+            gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
+            mostraPip(true);
+        };
+        const solta = () => { alcaCanto.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
+        alcaCanto.addEventListener('pointermove', mexe);
+        alcaCanto.addEventListener('pointerup', solta, { once: true });
+        alcaCanto.addEventListener('pointercancel', solta, { once: true });
     });
     // Alça no canto de cima à direita: arrastar para fora aumenta (o quadrinho cresce para cima e para a direita)
     const alca = pip.querySelector('.pip-alca');
@@ -2841,7 +2978,13 @@ function ligaPip() {
         alca.setPointerCapture(ev.pointerId);
         const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
         pip.classList.add('redimensionando');
-        const mexe = (e) => { gravaPref('clipeLargura', String(Math.round(Math.max(200, largura0 + Math.max(e.clientX - x0, (y0 - e.clientY) * proporcao))))); posicionaPip(); };
+        const baixo0 = pip.getBoundingClientRect().bottom;
+        const mexe = (e) => {
+            const largura = Math.round(Math.max(112, largura0 + Math.max(e.clientX - x0, (y0 - e.clientY) * proporcao)));
+            gravaPref('clipeLargura', String(largura));
+            gravaPref('clipeY', String(Math.round(baixo0 - largura / proporcao)));
+            posicionaPip();
+        };
         const solta = () => { alca.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); };
         alca.addEventListener('pointermove', mexe);
         alca.addEventListener('pointerup', solta, { once: true });
@@ -2853,7 +2996,7 @@ if (SUPORTA_CLIPE && 'BroadcastChannel' in window) {
     new BroadcastChannel('redcode-clipe').addEventListener('message', (ev) => {
         const d = ev.data || {};
         if (d.tipo === 'desanexou') { if (clipePip) fechaPip(false); gravaPref('clipe', 'solto'); }
-        if (d.tipo === 'anexar') { gravaPref('clipeInteira', d.inteira ? '1' : ''); abrePip(); }
+        if (d.tipo === 'anexar') abrePip();
         if (d.tipo === 'fechar') gravaPref('clipe', '');
         desenhaMidia();
     });
@@ -5922,7 +6065,10 @@ const SECOES_CONFIG = {
         const temInicio = !!(window.painelDesktop && window.painelDesktop.inicioWindows);
         let inicio = false;
         if (temInicio) { try { inicio = await window.painelDesktop.inicioWindows(); } catch (e) { /* sem resposta do app */ } }
+        const temAtualizacao = !!(window.painelDesktop && window.painelDesktop.atualizacao);
         return '<h3 class="config-titulo">Sistema</h3>'
+            + linhaConfig('Atualizações', temAtualizacao ? 'O Red Code já confere sozinho ao abrir e de tempos em tempos. Aqui confere agora; se tiver versão nova, aparece o cartão para atualizar acima do player.' : 'Só no app do Red Code.',
+                `<button class="mini" data-config-acao="atualizacoes" ${temAtualizacao ? '' : 'disabled'}>Buscar atualizações</button>`, 'atualizar versao nova release')
             + linhaConfig('Avisos no Windows', 'Avisa quando uma conversa termina ou faz uma pergunta. É o mesmo sino do topo da lista.', chaveConfig('avisos', notificar), 'notificacoes sino')
             + linhaConfig('Iniciar com o Windows', temInicio ? 'Abre o Red Code escondido na bandeja ao entrar no Windows.' : 'Só no app do Red Code (depois de fechar e abrir o app com esta versão).', chaveConfig('inicio', inicio, !temInicio), 'bandeja');
     },
@@ -6031,6 +6177,20 @@ janelaConfig.addEventListener('click', async (evt) => {
     const abrirRegra = evt.target.closest('[data-abrir-regra]');
     if (abrirRegra) { evt.preventDefault(); return abreArquivoCitado(abrirRegra.dataset.abrirRegra, evt.ctrlKey); }
     const acao = evt.target.closest('[data-config-acao]');
+    if (acao && acao.dataset.configAcao === 'atualizacoes') {
+        const texto = acao.textContent;
+        acao.disabled = true; acao.textContent = 'Procurando…';
+        try {
+            const r = await window.painelDesktop.atualizacao.acao('verificar');
+            desenhaAtualizacao(r);
+            if (r.resultado === 'ultima') recado(`Já está na última versão${r.versaoApp ? ' (' + r.versaoApp + ')' : ''}`);
+            else if (r.resultado === 'erro') recado('Não deu para procurar: ' + (r.erro || 'sem resposta do GitHub'));
+            else if (r.resultado === 'ocupado') recado(r.fase === 'pronta' ? 'A versão nova já está baixada: reinicie para usar' : 'A versão nova já está baixando');
+            else recado(r.modo === 'git' ? plural(r.commits, 'novidade no GitHub', 'novidades no GitHub') + ': reinicie para puxar' : `Versão ${r.versao} disponível: use o cartão acima do player`);
+        } catch (e) { recado('Não deu para procurar: ' + e.message); }
+        finally { acao.disabled = false; acao.textContent = texto; }
+        return;
+    }
     if (acao && acao.dataset.configAcao === 'logs') { const ok = await window.painelDesktop.abrirLogs(); if (!ok) recado('Não deu para abrir a pasta dos logs.'); return; }
     if (acao && acao.dataset.configAcao === 'reiniciar') {
         try { await api('/api/reiniciar', {}); recado('Reinício agendado: acontece quando nada estiver trabalhando'); } catch (e) { recado('Não consegui agendar: ' + e.message); }

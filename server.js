@@ -18,6 +18,7 @@ const gitScm = require('./git-scm');
 const chat = require('./chat');
 const perfis = require('./perfis');
 const midia = require('./midia');
+const videoNavegador = require('./video-navegador');
 // Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
 const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
 // Primeiro nome do usuário do Windows (henrique.freitas -> Henrique), para a saudação do Chat
@@ -1283,6 +1284,10 @@ function requisicaoConfiavel(req) {
 // Favoritas e vínculos entre conversas ("continuação de"), guardados num arquivo ao lado do servidor
 // PAINEL_DADOS: no Red Code.exe, %APPDATA%\Red Code (a pasta do programa é trocada a cada versão)
 const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
+// Extensão do navegador (vídeo no canto): copiada para uma pasta fixa, que é a que se carrega no navegador
+videoNavegador.configura(PASTA_DADOS);
+let PASTA_EXTENSAO = null;
+try { PASTA_EXTENSAO = videoNavegador.copiaExtensao(__dirname, PASTA_DADOS); } catch (e) { console.log('extensão do navegador: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
     const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], pastasExtras: [], navegador: 'padrao' };
@@ -2450,6 +2455,37 @@ const servidor = http.createServer(async (req, res) => {
             if (url.searchParams.get('t') !== TOKEN || !capa) { res.writeHead(capa ? 403 : 404); return res.end(); }
             res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600', 'X-Content-Type-Options': 'nosniff' });
             return res.end(capa);
+        }
+        // Vídeo no canto: a extensão do navegador manda o estado (só ela: cabeçalho próprio e origem de extensão,
+        // que página de site não consegue mandar sem a pré-checagem que este servidor não aprova)
+        if (url.pathname === '/api/midia/video' && req.method === 'POST') {
+            const origem = String(req.headers.origin || '');
+            if (req.headers['x-redcode-extensao'] !== '1' || (origem && !/^chrome-extension:\/\/[a-p]{32}$/.test(origem))) return responde(res, 403, { erro: 'só a extensão do Red Code' });
+            try { videoNavegador.recebe(await leCorpo(req, 1e4)); return responde(res, 200, { ok: true }); }
+            catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
+        if (url.pathname === '/api/midia/video' && req.method === 'GET') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), pastaExtensao: PASTA_EXTENSAO, navegadores: videoNavegador.navegadores() });
+        }
+        // Instalar a extensão (a pessoa aceitou na tela): atalhos do navegador com --load-extension e, se pedido, reinicia ele
+        if (url.pathname === '/api/midia/extensao' && req.method === 'POST') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            try {
+                const corpo = await leCorpo(req, 1e4);
+                return responde(res, 200, await videoNavegador.instalaExtensao(String(corpo.navegador || ''), PASTA_EXTENSAO, PASTA_DADOS, !!corpo.reiniciar));
+            } catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
+        // Opção B: endereço direto só do vídeo (yt-dlp), para vídeo que não deixa incorporar
+        if (url.pathname === '/api/midia/video-url' && req.method === 'GET') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            try { return responde(res, 200, { url: await videoNavegador.urlDoVideo(url.searchParams.get('id')) }); }
+            catch (e) { return responde(res, e.codigo === 'sem-ytdlp' ? 404 : 502, { erro: e.message, codigo: e.codigo || 'falhou' }); }
+        }
+        if (url.pathname === '/api/midia/ytdlp' && req.method === 'POST') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            try { return responde(res, 200, { ok: true, caminho: await videoNavegador.instalaYtdlp() }); }
+            catch (e) { return responde(res, 502, { erro: e.message }); }
         }
         if (url.pathname === '/clipe.html' || url.pathname === '/clipe.js') {
             res.writeHead(200, { 'Content-Type': url.pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });

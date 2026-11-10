@@ -1,274 +1,311 @@
-// Vídeo da mídia que está tocando (YouTube, YouTube Music no modo clipe...): captura a janela de onde vem o som e
-// mostra só a área que se mexe, que é o vídeo. Só música (capa parada) = sem vídeo. Usado no quadrinho do canto
-// (index.html) e na janela desanexada (clipe.html); a janela é achada pelo app desktop (painelDesktop.clipe.fonte).
+// Vídeo da mídia que está tocando: a extensão do navegador (pasta extensao/) diz qual vídeo do YouTube toca e em
+// que segundo; aqui toca uma cópia muda dele, sincronizada. Não lê a tela: funciona com a aba de trás, o navegador
+// coberto ou minimizado. A = player do YouTube (incorporado); B = endereço direto só do vídeo, pelo yt-dlp, para o
+// vídeo que não deixa incorporar. Usado no quadrinho do canto (index.html) e na janela desanexada (clipe.html).
 (function () {
-    // Retângulo do vídeo pelas bordas: dois lados do player são segmentos retos, paralelos e do mesmo tamanho
-    // (a borda das faixas pretas, ou a borda do player contra a página). Texto só faz trechos curtos de borda.
-    // Vale com o vídeo parado e com tela gravada. lum = luminância do quadro reduzido; mov = quantas vezes cada
-    // pixel mudou nas últimas amostras (pode ser tudo zero). Devolve { x, y, w, h } de 0 a 1.
-    function achaRetangulo(lum, mov, L, A) {
-        const LIMIAR = 9;
-        // Borda = diferença com 2 pixels antes (a redução do quadro borra a borda em dois)
-        const bH = new Uint8Array(L * A), bV = new Uint8Array(L * A);
-        for (let y = 2; y < A; y++) for (let x = 0; x < L; x++) if (Math.abs(lum[y * L + x] - lum[(y - 2) * L + x]) > LIMIAR) bH[(y - 1) * L + x] = 1;
-        for (let y = 0; y < A; y++) for (let x = 2; x < L; x++) if (Math.abs(lum[y * L + x] - lum[y * L + x - 2]) > LIMIAR) bV[y * L + x - 1] = 1;
-        // Segmentos retos (até 2 pixels de falha, 1 pixel de folga para o lado) com pelo menos 'minimo' de comprimento
-        function segmentos(n, m, tem, minimo) {
-            const lista = [];
-            for (let i = 1; i < n - 1; i++) {
-                let ini = -1, ult = -1;
-                const fecha = () => { if (ult + 1 - ini >= minimo) lista.push({ p: i, a: ini, b: ult + 1 }); ini = -1; };
-                for (let j = 0; j < m; j++) {
-                    if (tem(i, j) || tem(i - 1, j) || tem(i + 1, j)) { if (ini < 0) ini = j; ult = j; }
-                    else if (ini >= 0 && j - ult > 2) fecha();
-                }
-                if (ini >= 0) fecha();
-            }
-            // Vizinhos iguais (a borda tem 2-3 pixels de largura) viram um só
-            return lista.filter((s, k) => !lista.some((o, q) => q < k && Math.abs(o.p - s.p) <= 3 && Math.abs(o.a - s.a) <= 3 && Math.abs(o.b - s.b) <= 3));
-        }
-        const verticais = segmentos(L, A, (x, y) => bV[y * L + x], A * 0.25);
-        const horizontais = segmentos(A, L, (y, x) => bH[y * L + x], L * 0.25);
-        // Movimento acumulado (soma 2D): o retângulo precisa ter a maior parte do que se mexe
-        const somaM = new Float64Array((L + 1) * (A + 1));
-        let movTotal = 0;
-        for (let y = 0; y < A; y++) { let linha = 0; for (let x = 0; x < L; x++) { const m = mov && mov[y * L + x] >= 2 ? 1 : 0; linha += m; movTotal += m; somaM[(y + 1) * (L + 1) + x + 1] = somaM[y * (L + 1) + x + 1] + linha; } }
-        const movEm = (x0, y0, x1, y1) => somaM[y1 * (L + 1) + x1] - somaM[y0 * (L + 1) + x1] - somaM[y1 * (L + 1) + x0] + somaM[y0 * (L + 1) + x0];
-        let melhor = null;
-        const testa = (x0, y0, x1, y1) => {
-            const larg = x1 - x0, alt = y1 - y0, area = larg * alt;
-            // Proporção de vídeo; nem pequeno demais, nem quase a janela toda (aí é a página, não o player)
-            if (alt <= 0 || larg / alt < 1.25 || larg / alt > 2.45 || area < L * A * 0.05 || area > L * A * 0.65) return;
-            // Com movimento: o retângulo tem que ter quase tudo (um quadro dentro do vídeo, como o do jogo numa live, não serve)
-            if (movTotal >= 12 && movEm(x0, y0, x1, y1) / movTotal < 0.85) return;
-            if (!melhor || area > melhor.area) melhor = { area, x0, y0, x1, y1 };
-        };
-        // Par de lados (esquerdo e direito, ou topo e pé) que começam e terminam juntos
-        const pares = (lista, monta) => {
-            for (let i = 0; i < lista.length; i++) for (let j = 0; j < lista.length; j++) {
-                const s = lista[i], t = lista[j];
-                if (t.p - s.p < 8 || Math.abs(s.a - t.a) > 4 || Math.abs(s.b - t.b) > 4) continue;
-                monta(s, t);
-            }
-        };
-        pares(verticais, (s, t) => testa(s.p, Math.max(s.a, t.a), t.p, Math.min(s.b, t.b)));
-        pares(horizontais, (s, t) => testa(Math.max(s.a, t.a), s.p, Math.min(s.b, t.b), t.p));
-        return melhor && { x: melhor.x0 / L, y: melhor.y0 / A, w: (melhor.x1 - melhor.x0) / L, h: (melhor.y1 - melhor.y0) / A };
-    }
-    // Área do que se mexe: colunas e linhas com movimento, aceitando vãos parados de até 6% (entre o jogo e as
-    // webcams de uma live, por exemplo). Devolve { x, y, w, h } de 0 a 1 ou null
-    function areaDoMovimento(contagem, L, A) {
-        const colunas = new Array(L).fill(0), linhas = new Array(A).fill(0);
-        for (let y = 0; y < A; y++) for (let x = 0; x < L; x++) if (contagem[y * L + x] >= 2) { colunas[x]++; linhas[y]++; }
-        const trecho = (lista, minimo, vao) => {
-            let melhor = null, ini = -1, ult = -1, soma = 0, somaMelhor = 0;
-            for (let i = 0; i <= lista.length; i++) {
-                if (i < lista.length && lista[i] >= minimo) { if (ini < 0) { ini = i; soma = 0; } ult = i; soma += lista[i]; }
-                else if (ini >= 0 && (i === lista.length || i - ult > vao)) { if (soma > somaMelhor) { somaMelhor = soma; melhor = [ini, ult + 1]; } ini = -1; }
-            }
-            return melhor;
-        };
-        const cx = trecho(colunas, 2, Math.round(L * 0.06)), cy = trecho(linhas, 2, Math.round(A * 0.06));
-        return cx && cy ? { x: cx[0] / L, y: cy[0] / A, w: (cx[1] - cx[0]) / L, h: (cy[1] - cy[0]) / A } : null;
-    }
-    // Alarga a área até a margem da página: cada lado anda enquanto a próxima coluna (ou linha) não for lisa.
-    // O fundo da página em volta do vídeo é liso; o vídeo (mesmo com o fundo escuro) não é. Cada lado anda no máximo 15%
-    function cresceAteAMargem(lum, area, L, A) {
-        let x0 = Math.floor(area.x * L), x1 = Math.ceil((area.x + area.w) * L), y0 = Math.floor(area.y * A), y1 = Math.ceil((area.y + area.h) * A);
-        const lisa = (pega, n) => {
-            let soma = 0;
-            for (let i = 0; i < n; i++) soma += pega(i);
-            const media = soma / n;
-            let fora = 0;
-            // Fundo de página é chapado (captura sem perda): qualquer variação acima de 2 já é conteúdo
-            for (let i = 0; i < n; i++) if (Math.abs(pega(i) - media) > 2) fora++;
-            return fora <= n * 0.03;
-        };
-        const colunaLisa = (x) => lisa((i) => lum[(y0 + i) * L + x], y1 - y0);
-        const linhaLisa = (y) => lisa((i) => lum[y * L + x0 + i], x1 - x0);
-        const limX = Math.round(L * 0.15), limY = Math.round(A * 0.15);
-        const inicio = [x0, x1, y0, y1];
-        // Olha alguns pixels à frente: uma grade escura no fundo do vídeo tem colunas lisas entre as linhas dela;
-        // o vão entre o vídeo e o resto da página é bem maior que isso
-        const FRENTE_X = 8, FRENTE_Y = 5;
-        const proxima = (passos, lisaEm) => { for (let j = 0; j < passos; j++) if (!lisaEm(j)) return j + 1; return 0; };
-        for (let mudou = true; mudou;) {
-            mudou = false;
-            let n;
-            if (x0 > 0 && inicio[0] - x0 < limX && (n = proxima(Math.min(FRENTE_X, x0), (j) => colunaLisa(x0 - 1 - j)))) { x0 -= n; mudou = true; }
-            if (x1 < L && x1 - inicio[1] < limX && (n = proxima(Math.min(FRENTE_X, L - x1), (j) => colunaLisa(x1 + j)))) { x1 += n; mudou = true; }
-            if (y0 > 0 && inicio[2] - y0 < limY && (n = proxima(Math.min(FRENTE_Y, y0), (j) => linhaLisa(y0 - 1 - j)))) { y0 -= n; mudou = true; }
-            if (y1 < A && y1 - inicio[3] < limY && (n = proxima(Math.min(FRENTE_Y, A - y1), (j) => linhaLisa(y1 + j)))) { y1 += n; mudou = true; }
-        }
-        return { x: x0 / L, y: y0 / A, w: (x1 - x0) / L, h: (y1 - y0) / A };
-    }
-    const contem = (a, b) => b.x >= a.x - 0.02 && b.y >= a.y - 0.02 && b.x + b.w <= a.x + a.w + 0.02 && b.y + b.h <= a.y + a.h + 0.02;
-    const LARGURA_AMOSTRA = 320;   // quadro reduzido onde se procuram o player e o que se mexe
-    const AMOSTRAS = 16;           // ~6 s de história (uma amostra a cada 400 ms)
+    const ORIGEM_YT = 'https://www.youtube.com';
+    const PET_CARREGANDO = '<div class="pet pet-video" style="--cor-pet:#e8483d"><div class="pet-corpo"><span class="pet-boca"></span><span class="pet-balde" aria-hidden="true"><svg viewBox="0 0 14 16" width="14" height="16"><circle cx="3.6" cy="4.4" r="2.6" fill="#fff4d6"/><circle cx="7" cy="3.2" r="2.9" fill="#fff"/><circle cx="10.4" cy="4.4" r="2.6" fill="#fff4d6"/><path d="M1 5.6h12l-1.6 10H2.6z" fill="#fff"/><path d="M3.3 5.6h2l.3 10H4.1zM8.7 5.6h2l-1.1 10H8z" fill="#e8483d"/></svg></span><span class="pet-grao g1"></span><span class="pet-grao g2"></span><span class="pet-grao g3"></span></div><div class="pet-sombra"></div><span class="pet-nome pet-faz">Carregando o vídeo</span></div>';
+    const pega = async (url) => { const r = await fetch(url, { headers: { 'X-Painel': '1' } }); const d = await r.json().catch(() => ({})); if (!r.ok) throw Object.assign(new Error(d.erro || 'erro'), { codigo: d.codigo }); return d; };
     window.ClipeMusica = function (caixa, opcoes) {
+        opcoes = opcoes || {};
         const tela = caixa.querySelector('.clipe-tela');
         const aviso = caixa.querySelector('.clipe-aviso');
-        const video = Object.assign(document.createElement('video'), { muted: true, autoplay: true, playsInline: true });
-        tela.appendChild(video);
-        const amostra = document.createElement('canvas');
-        const pincel = amostra.getContext('2d', { willReadFrequently: true });
-        let midia = null, titulo = '', fluxo = null, fonteId = '', buscando = false, ultimaBusca = 0;
-        // Janela minimizada que o app tirou para fora da tela; se a imagem congelar lá, não tenta de novo
-        let fonteEscondida = false, naoEsconder = false;
-        // Posição exata do <video> dentro da janela (UI Automation do Windows); quando vem, vale mais que o detector de imagem
-        let inicioFluxo = 0;
-        let playerExato = null, perguntouPlayer = 0, playerRespondeu = false, fontePip = false;
-        let anterior = null, mascaras = [], contagem = null, quadros = 0;
-        let recorte = null, inteira = !!opcoes.inteira, paradoDesde = 0, semMovimentoDesde = 0, estado = '';
+        let navegadores = [];
+        let tempoYtEm = 0, taxaYt = 1, saltoEm = 0, latencia = { A: 0, B: 0 }, medeSalto = null, inicioB = 0, segurando = false;
+        // No app: acesso ao <video> de dentro do player do YouTube (tempo exato, velocidade fina); fora dele, a API
+        const ytDireto = window.painelDesktop && window.painelDesktop.clipe && window.painelDesktop.clipe.yt;
+        let ritmoA = 1, lendoYt = false, anuncioCopia = false, anuncioDesde = 0, temYtdlp = false;
+        // Troca para o B: o vídeo que está sendo preparado escondido e os vídeos em que o B não deu certo
+        let preparando = null, semDireto = '';
+        let fonte = null, atualId = '', modo = '', iframe = null, video = null, pronto = false, tempoYt = 0, estadoYt = -1, ultimoAjuste = 0, chamaPlayer = null, pedido = 0, ultimo = null, estado = '', pastaExtensao = '';
         const AVISOS = {
-            janela: 'Procurando a janela do vídeo…',
-            'sem-janela': 'Não achei a janela de onde vem o som. Ela pode ficar atrás de outras, mas não minimizada.',
-            procurando: 'Procurando o vídeo na janela…',
-            'sem-video': 'Só música: esta mídia não tem vídeo agora.',
-            aba: 'O vídeo está numa aba que não está aberta, e o navegador só desenha a aba da frente. Deixe a aba do vídeo aberta (dá para arrastá-la para uma janela só dela, que pode ficar atrás ou minimizada).',
-            minimizada: 'A janela do vídeo está minimizada e o navegador não desenha fora da tela. Abra o navegador com --disable-features=CalculateNativeWinOcclusion no atalho.',
-            parado: 'Imagem parada: o navegador para de desenhar quando fica todo coberto. Deixe um pedaço dele à mostra ou abra-o com --disable-features=CalculateNativeWinOcclusion no atalho.',
+            'sem-extensao': () => 'Para ver o vídeo aqui, o navegador precisa da extensão do Red Code.',
+            instalando: () => 'Instalando a extensão e reabrindo o navegador…',
+            instalada: () => 'Extensão instalada. Abra (ou recarregue) o vídeo no YouTube.',
+            'sem-video': () => 'Nenhum vídeo do YouTube tocando no navegador agora.',
+            'so-musica': () => 'Só música: no YouTube Music está no modo "Áudio" (troque para "Vídeo" para ver o clipe).',
+            anuncio: () => 'Anúncio no YouTube: o vídeo volta quando ele acabar.',
+            carregando: () => 'Carregando o vídeo…',
+            'sem-ytdlp': () => 'Este vídeo não deixa tocar fora do YouTube. Instale o yt-dlp para tocar mesmo assim.',
+            falhou: () => 'Não deu para tocar este vídeo aqui.',
         };
         function mudaEstado(novo) {
             if (novo === estado) return;
             estado = novo;
-            aviso.textContent = AVISOS[novo] || '';
-            aviso.hidden = !AVISOS[novo];
-            caixa.classList.toggle('clipe-com-aviso', !!AVISOS[novo] && novo !== 'procurando');
-            // Procurando o vídeo: a janela inteira aparece e o aviso fica numa faixa embaixo
-            caixa.classList.toggle('clipe-procurando', novo === 'procurando');
+            const texto = AVISOS[novo] ? AVISOS[novo]() : '';
+            aviso.textContent = texto;
+            // Carregando: um pet como o dos agentes, pulando com um play na mão
+            if (novo === 'carregando') aviso.innerHTML = PET_CARREGANDO;
+            aviso.hidden = !texto;
+            if (novo === 'sem-ytdlp') aviso.insertAdjacentHTML('beforeend', ' <button type="button" class="mini" data-instalar-ytdlp>Instalar o yt-dlp</button>');
+            // Extensão faltando: um botão por navegador que aceita instalar pelo Red Code; o resto, passo a passo
+            if (novo === 'sem-extensao') {
+                const botoes = navegadores.filter(n => n.suporta).map(n => `<button type="button" class="mini" data-instalar-extensao="${n.id}" data-nome="${n.nome}">Instalar no ${n.nome}</button>`).join(' ');
+                aviso.insertAdjacentHTML('beforeend', `<span class="instalar-extensao">${botoes} <button type="button" class="mini" data-extensao-manual>Instalar à mão</button></span>`);
+            }
+            caixa.classList.toggle('clipe-com-aviso', !!texto && novo !== 'carregando');
+            caixa.classList.toggle('clipe-carregando', novo === 'carregando');
             if (opcoes.aoEstado) opcoes.aoEstado(novo);
         }
-        // Recorte: o vídeo capturado é ampliado e deslocado para a área achada preencher a caixa
-        function aplicaRecorte() {
-            const r = !inteira && recorte;
-            Object.assign(video.style, r
-                ? { width: (100 / r.w) + '%', height: (100 / r.h) + '%', left: (-r.x / r.w * 100) + '%', top: (-r.y / r.h * 100) + '%', objectFit: 'fill' }
-                : { width: '100%', height: '100%', left: '0', top: '0', objectFit: 'contain' });
-            const proporcao = r && video.videoWidth ? (r.w * video.videoWidth) / (r.h * video.videoHeight) : (video.videoWidth ? video.videoWidth / video.videoHeight : 16 / 9);
-            if (opcoes.aoProporcao) opcoes.aoProporcao(proporcao);
-        }
-        function zeraHistoria() { anterior = null; mascaras = []; contagem = null; quadros = 0; paradoDesde = 0; semMovimentoDesde = 0; }
-        function paraFluxo() {
-            if (fonteEscondida && fonteId) window.painelDesktop.clipe.devolve(fonteId).catch(() => { });
-            fonteEscondida = false; playerExato = null; playerRespondeu = false; fontePip = false;
-            if (fluxo) fluxo.getTracks().forEach(t => t.stop());
-            fluxo = null; fonteId = ''; video.srcObject = null; recorte = null; zeraHistoria();
-        }
-        async function procuraJanela() {
-            if (buscando || !titulo) return;
-            buscando = true; ultimaBusca = Date.now();
-            try {
-                const fonte = await window.painelDesktop.clipe.fonte(titulo, !naoEsconder, midia && midia.app);
-                if (!fonte) { paraFluxo(); return mudaEstado(naoEsconder ? 'minimizada' : 'sem-janela'); }
-                if (fonte.emAba) { paraFluxo(); return mudaEstado('aba'); }
-                if (fonte.id === fonteId && fluxo) return;
-                paraFluxo();
-                const novo = await navigator.mediaDevices.getUserMedia({ audio: false, video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: fonte.id, maxWidth: 1920, maxHeight: 1080, maxFrameRate: 30 } } });
-                fluxo = novo; fonteId = fonte.id; fonteEscondida = !!fonte.escondida; inicioFluxo = Date.now();
-                // Picture-in-picture do próprio navegador: a janela inteira é o vídeo
-                if (fonte.pip) { playerExato = { x: 0, y: 0, w: 1, h: 1 }; playerRespondeu = true; fontePip = true; }
-                // Janela fechada: a captura acaba; a próxima volta do relógio procura de novo
-                novo.getVideoTracks()[0].addEventListener('ended', () => { if (fluxo === novo) { paraFluxo(); mudaEstado('sem-janela'); } });
-                video.srcObject = novo;
-                video.play().catch(() => { /* toca quando carregar */ });
-                mudaEstado('procurando');
-                aplicaRecorte();
-            } catch (e) { paraFluxo(); mudaEstado('sem-janela'); }
-            finally { buscando = false; }
-        }
-        // Maior trecho seguido de colunas (ou linhas) com bastante movimento
-        // A cada 400 ms: compara o quadro com o anterior, guarda onde mudou e, de tempos em tempos, recalcula a área do vídeo
-        function olha() {
-            if (!fluxo) { if (titulo && Date.now() - ultimaBusca > 5000) procuraJanela(); return; }
-            if (!video.videoWidth || video.readyState < 2) return;
-            if (window.painelDesktop.clipe.player && !fontePip && Date.now() - perguntouPlayer > 1500) {
-                perguntouPlayer = Date.now();
-                const id = fonteId;
-                window.painelDesktop.clipe.player(id).then((area) => { if (id === fonteId && area !== 'lendo') { playerExato = area; playerRespondeu = true; } }).catch(() => { playerRespondeu = true; });
+        aviso.addEventListener('click', async (ev) => {
+            const manual = ev.target.closest('[data-extensao-manual]');
+            if (manual) { aviso.textContent = `No navegador, abra a página de extensões (brave://extensions, chrome://extensions ou edge://extensions), ligue o "Modo do desenvolvedor", clique em "Carregar sem compactação" e escolha a pasta: ${pastaExtensao}`; return; }
+            const inst = ev.target.closest('[data-instalar-extensao]');
+            if (inst) {
+                const nome = inst.dataset.nome;
+                const ok = opcoes.confirma ? await opcoes.confirma(`Instalar a extensão no ${nome}?`, `O Red Code coloca a extensão nos atalhos do ${nome} (guarda uma cópia dos atalhos antes) e reabre o ${nome}: as abas e janelas voltam como estavam. O que estiver digitado e não enviado em alguma página se perde.`) : confirm(`Instalar a extensão no ${nome}? O ${nome} vai fechar e abrir de novo, com as abas de volta.`);
+                if (!ok) return;
+                mudaEstado('instalando');
+                try { const r = await fetch('/api/midia/extensao', { method: 'POST', headers: { 'X-Painel': '1', 'Content-Type': 'application/json' }, body: JSON.stringify({ navegador: inst.dataset.instalarExtensao, reiniciar: true }) }); const d = await r.json(); if (!r.ok) throw new Error(d.erro); mudaEstado('instalada'); }
+                catch (e) { estado = ''; mudaEstado('sem-extensao'); aviso.insertAdjacentHTML('afterbegin', `<b>${e.message}</b> `); }
+                return;
             }
-            const L = LARGURA_AMOSTRA, A = Math.max(1, Math.round(L * video.videoHeight / video.videoWidth));
-            if (amostra.width !== L || amostra.height !== A) { amostra.width = L; amostra.height = A; zeraHistoria(); }
-            pincel.drawImage(video, 0, 0, L, A);
-            const d = pincel.getImageData(0, 0, L, A).data;
-            if (!contagem) contagem = new Uint16Array(L * A);
-            const tocando = midia && midia.estado === 'Playing';
-            if (anterior) {
-                const mascara = new Uint8Array(L * A);
-                let mudou = 0;
-                for (let p = 0, i = 0; p < mascara.length; p++, i += 4) {
-                    if (Math.abs(d[i] - anterior[i]) + Math.abs(d[i + 1] - anterior[i + 1]) + Math.abs(d[i + 2] - anterior[i + 2]) > 24) { mascara[p] = 1; contagem[p]++; mudou++; }
+            const b = ev.target.closest('[data-instalar-ytdlp]');
+            if (!b) return;
+            b.disabled = true; b.textContent = 'Baixando o yt-dlp…';
+            try { await fetch('/api/midia/ytdlp', { method: 'POST', headers: { 'X-Painel': '1' } }).then(r => { if (!r.ok) throw new Error(); }); atualId = ''; }
+            catch (e) { b.textContent = 'Não deu para baixar'; }
+        });
+        function limpa() {
+            clearInterval(chamaPlayer);
+            if (iframe) { iframe.remove(); iframe = null; }
+            if (video) { video.removeAttribute('src'); video.load(); video.remove(); video = null; }
+            if (preparando && preparando.v) { preparando.v.removeAttribute('src'); preparando.v.remove(); }
+            preparando = null;
+            pronto = false; estadoYt = -1; tempoYt = 0; modo = '';
+        }
+        // Onde o vídeo do navegador está agora: o último tempo recebido + o que passou desde então (se tocando)
+        function tempoAgora() {
+            if (!fonte) return 0;
+            const passou = fonte.pausado || fonte.anuncio || fonte.esperando ? 0 : Math.max(0, (Date.now() - fonte.lidoEm) / 1000) * (fonte.taxa || 1);
+            return fonte.tempo + passou;
+        }
+        const manda = (msg) => { if (iframe && iframe.contentWindow) iframe.contentWindow.postMessage(JSON.stringify({ ...msg, id: 1, channel: 'widget' }), ORIGEM_YT); };
+        const comando = (func, args) => manda({ event: 'command', func, args: args || [] });
+        // A: player do YouTube incorporado, mudo, sem controles
+        function tocaIncorporado(id) {
+            limpa();
+            modo = 'A';
+            mudaEstado('carregando');
+            iframe = document.createElement('iframe');
+            iframe.allow = 'autoplay; encrypted-media';
+            iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+            iframe.src = `${ORIGEM_YT}/embed/${id}?enablejsapi=1&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&iv_load_policy=3&disablekb=1&fs=0&start=${Math.floor(tempoAgora())}&origin=${encodeURIComponent(location.origin)}`;
+            // O player só manda eventos depois de ouvir "listening": repete até ele dizer que está pronto
+            iframe.addEventListener('load', () => {
+                let vezes = 0;
+                clearInterval(chamaPlayer);
+                chamaPlayer = setInterval(() => { if (pronto || ++vezes > 40) return clearInterval(chamaPlayer); manda({ event: 'listening' }); }, 250);
+            });
+            tela.appendChild(iframe);
+        }
+        // Com o yt-dlp: o B é o mais preciso (medido: ~20 ms, sem anúncio) mas leva uns segundos para ter o endereço.
+        // Então o A aparece primeiro e o B se prepara escondido por baixo: quando fica a menos de 60 ms do navegador
+        // (ou passados 8 s), assume no lugar do A, sem piscar
+        async function preparaDireto(id) {
+            if (preparando || semDireto === id || modo !== 'A') return;
+            preparando = { id };
+            let url;
+            try { url = (await pega('/api/midia/video-url?id=' + encodeURIComponent(id))).url; }
+            catch (e) { semDireto = id; preparando = null; return; }
+            if (atualId !== id || modo !== 'A') { preparando = null; return; }
+            const v = Object.assign(document.createElement('video'), { muted: true, autoplay: true, playsInline: true });
+            v.style.opacity = '0';
+            preparando = { id, v, desde: Date.now(), perto: 0 };
+            v.addEventListener('error', () => { if (preparando && preparando.v === v) { v.remove(); preparando = null; semDireto = id; } });
+            v.addEventListener('loadedmetadata', () => { v.currentTime = tempoAgora() + 0.3; });
+            v.src = url;
+            tela.insertBefore(v, tela.firstChild);
+        }
+        // Chamado a cada volta da sincronia: acerta o B escondido pelo ritmo e troca quando ele está junto
+        function acertaPreparado() {
+            const pr = preparando;
+            if (!pr || !pr.v) return;
+            if (pr.id !== atualId || modo !== 'A') { pr.v.remove(); preparando = null; return; }
+            const v = pr.v;
+            if (v.readyState < 2) return;
+            const parado = fonte && (fonte.pausado || fonte.anuncio || fonte.esperando);
+            if (parado) { if (!v.paused) v.pause(); return; }
+            if (v.paused) v.play().catch(() => { });
+            const dif = tempoAgora() - v.currentTime;
+            if (Math.abs(dif) > 2) { v.currentTime = tempoAgora() + 0.3; return; }
+            v.playbackRate = (fonte.taxa || 1) * (1 + Math.max(-0.1, Math.min(0.1, dif * 0.5)));
+            pr.perto = Math.abs(dif) < 0.06 ? pr.perto + 1 : 0;
+            if (pr.perto >= 3 || Date.now() - pr.desde > 8000) {
+                // Assume: some o A, o B fica no lugar
+                clearInterval(chamaPlayer);
+                if (iframe) { iframe.remove(); iframe = null; }
+                pronto = false; estadoYt = -1; tempoYt = 0; tempoYtEm = 0;
+                video = v; video.style.opacity = '';
+                video.addEventListener('error', () => { if (video === v) mudaEstado('falhou'); });
+                modo = 'B'; preparando = null; saltoEm = Date.now(); inicioB = Date.now();
+                if (opcoes.aoProporcao && v.videoWidth) opcoes.aoProporcao(v.videoWidth / v.videoHeight);
+                if (estado === 'carregando') mudaEstado('');
+            }
+        }
+        // B: endereço direto só do vídeo (yt-dlp) num <video> daqui
+        async function tocaDireto(id) {
+            limpa();
+            modo = 'B';
+            mudaEstado('carregando');
+            const meu = ++pedido;
+            let url;
+            try { url = (await pega('/api/midia/video-url?id=' + encodeURIComponent(id))).url; }
+            catch (e) { if (meu === pedido) mudaEstado(e.codigo === 'sem-ytdlp' ? 'sem-ytdlp' : 'falhou'); return; }
+            if (meu !== pedido || atualId !== id) return;
+            video = Object.assign(document.createElement('video'), { muted: true, autoplay: true, playsInline: true });
+            video.addEventListener('loadedmetadata', () => { video.currentTime = tempoAgora() + 0.3; inicioB = Date.now(); if (opcoes.aoProporcao && video.videoWidth) opcoes.aoProporcao(video.videoWidth / video.videoHeight); });
+            video.addEventListener('playing', () => { if (estado === 'carregando') mudaEstado(''); });
+            video.addEventListener('error', () => { if (video) mudaEstado('falhou'); });
+            video.src = url;
+            tela.appendChild(video);
+        }
+        window.addEventListener('message', aoMensagem);
+        function aoMensagem(ev) {
+            if (!iframe || ev.source !== iframe.contentWindow) return;
+            let d;
+            try { d = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data; } catch (e) { return; }
+            if (!d || !d.event) return;
+            if (d.event === 'onReady' || (d.event === 'initialDelivery' && !pronto)) { pronto = true; comando('mute'); sincroniza(true); mudaEstado(''); }
+            // 101/150/153: o dono não deixa tocar fora do YouTube (ou falta a origem) -> B
+            else if (d.event === 'onError') { if (modo === 'A' && atualId) tocaDireto(atualId); }
+            else if (d.event === 'onStateChange') estadoYt = d.info;
+            else if (d.event === 'infoDelivery' && d.info) {
+                if (typeof d.info.currentTime === 'number') { tempoYt = d.info.currentTime; tempoYtEm = Date.now(); }
+                if (typeof d.info.playbackRate === 'number') taxaYt = d.info.playbackRate;
+                if (typeof d.info.playerState === 'number') estadoYt = d.info.playerState;
+            }
+        }
+        // Onde a cópia está agora (no player do YouTube: o último informe + o que passou, se tocando)
+        function copiaAgora() {
+            if (modo === 'B') return video && video.readyState >= 1 ? video.currentTime : null;
+            if (modo === 'A' && pronto && tempoYtEm) return tempoYt + (estadoYt === 1 ? (Date.now() - tempoYtEm) / 1000 * (taxaYt || 1) : 0);
+            return null;
+        }
+        // Ajustes da sincronia (window.__clipeAjustes troca para medir outras estratégias)
+        // B (vídeo direto): ritmo a cada 100 ms, zona morta de 15 ms -> ~10-20 ms de diferença (mediana). A (player do
+        // YouTube): ele não acelera de verdade quando a velocidade muda, então pula a partir de 0,25 s, compensando o
+        // tempo que o player leva para voltar a tocar -> ~80 ms
+        const AJUSTES = { estrategia: 'ritmo', limiteA: 0.25, limiteB: 0.5, esperaA: 3000, esperaB: 2000, limiteSalto: 2, ganho: 0.4, maxRitmo: 0.1, zona: 0.015, compensa: true, frequencia: 100 };
+        const ajustes = () => Object.assign({}, AJUSTES, window.__clipeAjustes || {});
+        function pula(alvo, aj) {
+            const lat = aj.compensa ? latencia[modo] : 0;
+            saltoEm = Date.now();
+            if (modo === 'A') comando('seekTo', [alvo + lat, true]); else video.currentTime = alvo + lat;
+            // Mede quanto o pulo atrasou (o player leva um tempo para voltar a tocar) e aprende para o próximo
+            if (aj.compensa) medeSalto = Date.now() + (modo === 'A' ? 1800 : 1000);
+        }
+        // Acompanha o navegador: tocar/pausar, velocidade e posição
+        function sincroniza(forca) {
+            if (!fonte || !modo) return;
+            if (preparando) acertaPreparado();
+            const aj = ajustes();
+            // Carregando no navegador (buffer): espera junto, senão a cópia sai na frente
+            const parado = fonte.pausado || fonte.anuncio || fonte.esperando;
+            const alvo = tempoAgora();
+            const taxa = fonte.taxa || 1;
+            // No app: lê o <video> do player direto (tempo exato, anúncio, ritmo); já com imagem, o player está pronto
+            // mesmo que o aviso "onReady" por mensagem ainda não tenha chegado (às vezes demora vários segundos)
+            if (modo === 'A' && ytDireto && aj.direto !== false && !lendoYt) {
+                lendoYt = true;
+                ytDireto(ritmoA).then((i) => {
+                    lendoYt = false;
+                    if (!i || modo !== 'A') return;
+                    anuncioCopia = !!i.anuncio;
+                    if (i.anuncio) return;
+                    tempoYt = i.t; tempoYtEm = Date.now(); taxaYt = i.r;
+                    if (!i.p && estadoYt !== 3) estadoYt = 1;
+                    if (!pronto && i.pronto >= 2) { pronto = true; comando('mute'); mudaEstado(''); }
+                }, () => { lendoYt = false; });
+            }
+            if (modo === 'A' && pronto) {
+                // 1 = tocando, 3 = carregando
+                if (!parado && estadoYt !== 1 && estadoYt !== 3) comando('playVideo');
+                if (parado && (estadoYt === 1 || estadoYt === 3)) comando('pauseVideo');
+            } else if (modo === 'B' && video && video.readyState >= 1) {
+                if (parado && !video.paused) video.pause();
+                if (!parado && video.paused && !segurando) video.play().catch(() => { });
+            } else return;
+            const copia = copiaAgora();
+            if (copia == null) return;
+            const dif = alvo - copia;   // > 0: a cópia está atrás
+            // Só aprende com diferença pequena (uma grande é troca de música ou pulo no navegador, não atraso do pulo)
+            if (medeSalto && Date.now() >= medeSalto && !parado) { if (Math.abs(dif) < 1.5) latencia[modo] = Math.max(0, Math.min(1.5, latencia[modo] + dif * 0.7)); medeSalto = null; }
+            const ritmoFino = modo === 'B' || aj.ritmoA === true;
+            if (aj.estrategia === 'ritmo' && ritmoFino && !parado) {
+                // Diferença pequena: acelera ou freia um pouco até alcançar (sem pular, a imagem não engasga)
+                if (forca || Math.abs(dif) > aj.limiteSalto) { if (forca || Date.now() - saltoEm > 2500) pula(alvo, aj); return; }
+                // B à frente: para exatamente pela diferença (o trecho já está carregado, volta na hora) -- mais certo que pular
+                if (modo === 'B' && dif < -(aj.segura || 0.12) && dif > -3) {
+                    if (!segurando) { segurando = true; video.pause(); setTimeout(() => { segurando = false; if (modo === 'B' && video && fonte && !fonte.pausado) video.play().catch(() => { }); }, Math.max(0, -dif * 1000 - 15)); }
+                    return;
                 }
-                mascaras.push(mascara);
-                if (mascaras.length > AMOSTRAS) { const velha = mascaras.shift(); for (let p = 0; p < velha.length; p++) contagem[p] -= velha[p]; }
-                // Nenhum pixel mudou com a música tocando: a imagem congelou (navegador todo coberto)
-                if (mudou === 0 && tocando) { if (!paradoDesde) paradoDesde = Date.now(); }
-                else paradoDesde = 0;
-                // Imagem parada na janela que estava minimizada: devolve ela (fora da tela não adianta)
-                if (paradoDesde && Date.now() - paradoDesde > 6000 && fonteEscondida) { naoEsconder = true; paraFluxo(); mudaEstado('minimizada'); return; }
-                if (paradoDesde && Date.now() - paradoDesde > 6000) mudaEstado('parado');
-                else if (estado === 'parado') mudaEstado(recorte ? '' : 'procurando');
-                if (++quadros % 3 === 0 && estado !== 'parado') calculaArea(L, A, tocando);
+                if (segurando) return;
+                // Recém-entrado (até 8 s): o vídeo entra com uns décimos de atraso; pular acerta em ~1 s, o ritmo levaria vários
+                if (modo === 'B' && Date.now() - inicioB < 8000 && Math.abs(dif) > (aj.saltoInicio || 0.2) && Date.now() - saltoEm > 1200) { pula(alvo, aj); return; }
+                const ritmo = Math.abs(dif) < aj.zona ? taxa : taxa * (1 + Math.max(-aj.maxRitmo, Math.min(aj.maxRitmo, dif * aj.ganho)));
+                if (modo === 'B') { if (Math.abs(video.playbackRate - ritmo) > 0.004) video.playbackRate = ritmo; }
+                else if (ytDireto && aj.direto !== false) ritmoA = ritmo;
+                else comando('setPlaybackRate', [Math.round(ritmo * 100) / 100]);
+                return;
             }
-            anterior = d;
+            // Pular quando passa do limite
+            if (modo === 'B') { if (video.playbackRate !== taxa) video.playbackRate = taxa; }
+            else { ritmoA = taxa; comando('setPlaybackRate', [taxa]); }
+            const limite = modo === 'A' ? aj.limiteA : aj.limiteB, espera = modo === 'A' ? aj.esperaA : aj.esperaB;
+            if (forca || (Math.abs(dif) > limite && Date.now() - saltoEm > espera)) pula(alvo, aj);
         }
-        function calculaArea(L, A, tocando) {
-            // 1º: o retângulo do player; 2º (vídeo sem borda nítida): a área que se mexe
-            if (playerExato) return usaArea(playerExato, true);
-            // A 1ª leitura do player leva ~1 s: espera ela antes de cair no detector de imagem (senão o recorte pula)
-            if (window.painelDesktop.clipe.player && !playerRespondeu && Date.now() - inicioFluxo < 6000) return;
-            // Espera ~2,4 s de história: antes disso não dá para saber o que se mexe (e o recorte pularia)
-            if (mascaras.length < 6) return;
-            const lum = new Uint8Array(L * A);
-            for (let p = 0, i = 0; p < lum.length; p++, i += 4) lum[p] = (anterior[i] * 2 + anterior[i + 1] * 5 + anterior[i + 2]) >> 3;
-            const retangulo = achaRetangulo(lum, contagem, L, A);
-            const movimento = areaDoMovimento(contagem, L, A);
-            // Área pequena (barra de progresso, animação de botão) não é vídeo
-            const mexe = movimento && movimento.w * movimento.h >= 0.02 && movimento.w >= 0.1 && movimento.h >= 0.1;
-            // Retângulo das bordas que tem tudo o que se mexe: é o vídeo. Se não tem (é um quadro dentro do vídeo,
-            // como o do jogo numa live), vale a área do movimento alargada até a margem da página
-            if (retangulo && (!mexe || contem(retangulo, movimento))) return usaArea(retangulo);
-            if (mexe) return usaArea(cresceAteAMargem(lum, movimento, L, A));
-            if (retangulo) return usaArea(retangulo);
-            if (tocando) {
-                if (!semMovimentoDesde) semMovimentoDesde = Date.now();
-                // ~8 s tocando sem nada se mexer: é só a capa da música
-                if (Date.now() - semMovimentoDesde > 8000) { if (recorte) { recorte = null; aplicaRecorte(); } mudaEstado('sem-video'); }
+        // O que a extensão mandou por último
+        async function le() {
+            let r;
+            try { r = await pega('/api/midia/video'); } catch (e) { return; }
+            pastaExtensao = r.pastaExtensao || pastaExtensao;
+            navegadores = r.navegadores || navegadores;
+            temYtdlp = !!r.ytdlp;
+            if (temYtdlp && modo === 'A' && atualId && !preparando && semDireto !== atualId && (window.__clipeAjustes || {}).trocaB !== false) preparaDireto(atualId);
+            if (modo === 'A' && anuncioCopia && temYtdlp && atualId) {
+                if (!anuncioDesde) anuncioDesde = Date.now();
+                else if (Date.now() - anuncioDesde > 1500) { anuncioDesde = 0; anuncioCopia = false; tocaDireto(atualId); }
+            } else anuncioDesde = 0;
+            const v = r.video;
+            // Relógio do servidor x daqui: o "lidoEm" vira hora local
+            fonte = v ? { ...v, lidoEm: Date.now() - Math.max(0, (r.agora || 0) - v.recebidoEm) } : null;
+            if (!r.extensao) { limpa(); atualId = ''; return (estado === 'instalando' || estado === 'instalada') ? undefined : mudaEstado('sem-extensao'); }
+            if (!v) { limpa(); atualId = ''; return mudaEstado('sem-video'); }
+            if (v.modo && /ATV/.test(v.modo)) { limpa(); atualId = ''; return mudaEstado('so-musica'); }
+            if (v.id !== atualId) {
+                atualId = v.id;
+                latencia = { A: 0, B: 0 }; medeSalto = null;
+                if (opcoes.aoProporcao) opcoes.aoProporcao(16 / 9);
+                if (opcoes.aoTrocar) opcoes.aoTrocar(v);
+                // Endereço direto já buscado (a fila foi buscada antes): vai direto para o B, que entra em ~1 s
+                if (temYtdlp && v.urlPronta && (window.__clipeAjustes || {}).direto0 !== false) tocaDireto(v.id);
+                else tocaIncorporado(v.id);
             }
+            if (v.anuncio) mudaEstado('anuncio');
+            else if (estado === 'anuncio') mudaEstado(pronto || (video && !video.paused) ? '' : 'carregando');
+            sincroniza(false);
         }
-        let confirmadoEm = 0;
-        function usaArea(area, exata) {
-            semMovimentoDesde = 0;
-            const r = recorte;
-            // Área menor dentro da atual (as webcams de uma live pararam um pouco): segura a maior por 30 s
-            // (a posição exata do player não precisa disso)
-            if (!exata && r && contem(r, area) && area.w * area.h < r.w * r.h * 0.9) { if (Date.now() - confirmadoEm < 30000) return mudaEstado(''); }
-            else confirmadoEm = Date.now();
-            // Só troca se mudou de verdade (o vídeo ficar escuro numa borda não faz o quadro pular)
-            if (!r || Math.abs(r.x - area.x) > 0.02 || Math.abs(r.y - area.y) > 0.02 || Math.abs(r.w - area.w) > 0.03 || Math.abs(r.h - area.h) > 0.03) { recorte = area; aplicaRecorte(); }
-            mudaEstado('');
-        }
-        const relogio = setInterval(olha, 400);
-        video.addEventListener('loadedmetadata', aplicaRecorte);
+        // A cada 250 ms (é tudo no próprio PC): pausa, pulo e troca de música do navegador chegam rápido
+        const relogio = setInterval(le, 250);
+        let relogioSinc = null;
+        const ligaSinc = () => { clearInterval(relogioSinc); relogioSinc = setInterval(() => sincroniza(false), ajustes().frequencia); };
+        ligaSinc();
+        le();
         return {
-            // Estado do player do Windows (a cada ~2 s): música nova = procura a janela de novo (o título dela muda)
-            atualiza(m) {
-                if (!m || m.nada || m.erro || !m.titulo) return;
-                midia = m;
-                if (m.titulo !== titulo) {
-                    titulo = m.titulo;
-                    if (!fluxo) mudaEstado('janela');
-                    procuraJanela();
-                }
-            },
-            // Janela inteira x só o vídeo
-            alternaInteira() { inteira = !inteira; aplicaRecorte(); return inteira; },
-            inteira: () => inteira,
+            // Compatível com a chamada do player do Windows (não precisa mais: quem manda é a extensão)
+            atualiza() { },
+            atual: () => fonte,
+            // Onde a cópia está (para conferir a sincronia)
+            tempoCopia: () => modo === 'B' ? (video ? video.currentTime : null) : (pronto ? tempoYt : null),
+            modo: () => modo,
+            // Usa o endereço direto (B) no vídeo atual, mesmo que ele deixe incorporar (teste e conserto manual)
+            forcaDireto: () => { if (atualId) tocaDireto(atualId); },
             estado: () => estado,
-            destroi() { clearInterval(relogio); paraFluxo(); video.remove(); },
+            // Medição: onde o vídeo do navegador está e onde a cópia está, agora
+            medida: () => ({ alvo: fonte ? tempoAgora() : null, copia: copiaAgora(), modo, anuncioCopia, latencia: { ...latencia }, ritmo: modo === 'B' && video ? video.playbackRate : taxaYt }),
+            religaSinc: ligaSinc,
+            destroi() { clearInterval(relogio); clearInterval(relogioSinc); window.removeEventListener('message', aoMensagem); pedido++; limpa(); },
         };
     };
-    window.ClipeMusica.achaRetangulo = achaRetangulo;
-    window.ClipeMusica.areaDoMovimento = areaDoMovimento;
-    window.ClipeMusica.cresceAteAMargem = cresceAteAMargem;
 })();

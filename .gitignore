@@ -14,3 +14,6 @@ teste-chat/
 ANDAMENTO-*.txt
 *.mojibake-bak
 /+
+
+# yt-dlp baixado pelo Red Code (vídeo no canto)
+bin/
