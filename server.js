@@ -1296,6 +1296,9 @@ function requisicaoConfiavel(req) {
 const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
 // Extensão do navegador (vídeo no canto): copiada para uma pasta fixa, que é a que se carrega no navegador
 videoNavegador.configura(PASTA_DADOS);
+// YouTube Music Desktop (app à parte, sem extensão): o vídeo vem do Companion Server dele, como mais uma aba
+let ytmDesktop = null;
+try { ytmDesktop = require('./ytm-desktop'); ytmDesktop.configura(PASTA_DADOS, videoNavegador.recebe); } catch (e) { ytmDesktop = null; console.log('ytm desktop: ' + e.message); }
 let PASTA_EXTENSAO = null;
 try { PASTA_EXTENSAO = videoNavegador.copiaExtensao(__dirname, PASTA_DADOS); } catch (e) { console.log('extensão do navegador: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
@@ -1831,7 +1834,9 @@ function cancelaTrocaPerfil() {
 }
 function versaoServidor() {
     const alterado = Math.max(...['server.js', 'chat.js'].map(a => { try { return fs.statSync(path.join(__dirname, a)).mtimeMs; } catch (e) { return 0; } }));
-    return { vigiados: [...vigias.keys()], perfil: perfis.perfilInfo(), perfilPendente: perfilPendente ? perfis.perfilInfo(perfilPendente) : null, encerrar: encerrarEmVezDeReiniciar, terminais: terminal.quantos(), comLancador: !!process.env.PAINEL_LANCADOR, pastaDados: PASTA_DADOS, desatualizado: alterado > INICIO_SERVIDOR, iniciado: new Date(INICIO_SERVIDOR).toISOString(), alterado: new Date(alterado).toISOString(), reinicioAgendado };
+    let versaoApp = '';
+    try { versaoApp = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version || ''; } catch (e) { /* sem package.json */ }
+    return { versaoApp, vigiados: [...vigias.keys()], perfil: perfis.perfilInfo(), perfilPendente: perfilPendente ? perfis.perfilInfo(perfilPendente) : null, encerrar: encerrarEmVezDeReiniciar, terminais: terminal.quantos(), comLancador: !!process.env.PAINEL_LANCADOR, pastaDados: PASTA_DADOS, desatualizado: alterado > INICIO_SERVIDOR, iniciado: new Date(INICIO_SERVIDOR).toISOString(), alterado: new Date(alterado).toISOString(), reinicioAgendado };
 }
 
 // Mesma trava do enviar: não mexe numa conversa trabalhando em outro lugar
@@ -2550,7 +2555,7 @@ const servidor = http.createServer(async (req, res) => {
         }
         if (url.pathname === '/api/midia/video' && req.method === 'GET') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
-            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), pastaExtensao: PASTA_EXTENSAO, navegadores: videoNavegador.navegadores() });
+            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), pastaExtensao: PASTA_EXTENSAO, navegadores: videoNavegador.navegadores(), ytmDesktop: ytmDesktop ? ytmDesktop.estado() : null });
         }
         // Instalar a extensão (a pessoa aceitou na tela): atalhos do navegador com --load-extension e, se pedido, reinicia ele
         if (url.pathname === '/api/midia/extensao' && req.method === 'POST') {

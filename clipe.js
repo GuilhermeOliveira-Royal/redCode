@@ -17,6 +17,8 @@
         let ritmoA = 1, lendoYt = false, anuncioCopia = false, anuncioDesde = 0, temYtdlp = false;
         // Troca para o B: o vídeo que está sendo preparado escondido e os vídeos em que o B não deu certo
         let preparando = null, semDireto = '';
+        // O que falta no YouTube Music Desktop para o vídeo chegar (ligar a autorização, aprovar no app)
+        let avisoYtm = '', avisoYtmMostrado = '';
         let fonte = null, atualId = '', modo = '', iframe = null, video = null, pronto = false, tempoYt = 0, estadoYt = -1, ultimoAjuste = 0, chamaPlayer = null, pedido = 0, ultimo = null, estado = '', pastaExtensao = '';
         const AVISOS = {
             'sem-extensao': () => 'Para ver o vídeo aqui, o navegador precisa da extensão do Red Code.',
@@ -30,13 +32,15 @@
             falhou: () => 'Não deu para tocar este vídeo aqui.',
         };
         function mudaEstado(novo) {
-            if (novo === estado) return;
+            if (novo === estado && avisoYtm === avisoYtmMostrado) return;
             estado = novo;
+            avisoYtmMostrado = avisoYtm;
             const texto = AVISOS[novo] ? AVISOS[novo]() : '';
             aviso.textContent = texto;
             // Carregando: um pet como o dos agentes, pulando com um play na mão
             if (novo === 'carregando') aviso.innerHTML = PET_CARREGANDO;
             aviso.hidden = !texto;
+            if (avisoYtm && (novo === 'sem-extensao' || novo === 'sem-video')) { const linha = document.createElement('small'); linha.style.display = 'block'; linha.style.marginTop = '6px'; linha.textContent = 'YouTube Music Desktop: ' + avisoYtm; aviso.appendChild(linha); }
             if (novo === 'sem-ytdlp') aviso.insertAdjacentHTML('beforeend', ' <button type="button" class="mini" data-instalar-ytdlp>Instalar o yt-dlp</button>');
             // Extensão faltando: um botão por navegador que aceita instalar pelo Red Code; o resto, passo a passo
             if (novo === 'sem-extensao') {
@@ -262,6 +266,7 @@
             pastaExtensao = r.pastaExtensao || pastaExtensao;
             navegadores = r.navegadores || navegadores;
             temYtdlp = !!r.ytdlp;
+            avisoYtm = r.ytmDesktop && r.ytmDesktop.aviso || '';
             if (temYtdlp && modo === 'A' && atualId && !preparando && semDireto !== atualId && (window.__clipeAjustes || {}).trocaB !== false) preparaDireto(atualId);
             if (modo === 'A' && anuncioCopia && temYtdlp && atualId) {
                 if (!anuncioDesde) anuncioDesde = Date.now();

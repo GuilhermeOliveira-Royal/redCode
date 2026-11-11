@@ -22,10 +22,22 @@ function roda(exe, args, cwd, tempo) {
 }
 
 // ---------- Pelo código ----------
+// O package-lock.json muda sozinho (npm install com outra versão do npm) e travava o pull para sempre: se ele é a
+// única alteração local, volta ao do git. Devolve o que ainda está alterado ('' = pasta limpa)
+async function alteracoesLocais(git, log) {
+    let status = await git(['status', '--porcelain', '--untracked-files=no']).catch(() => 'erro');
+    const arquivos = status.split(/\r?\n/).filter(Boolean).map(l => l.trim().replace(/^\S+\s+/, ''));
+    if (arquivos.length && arquivos.every(a => a === 'package-lock.json')) {
+        try { await git(['checkout', '--', 'package-lock.json']); if (log) log('package-lock.json alterado localmente: restaurado para puxar'); status = ''; }
+        catch (e) { if (log) log('não deu para restaurar o package-lock.json: ' + e.message.slice(0, 160)); }
+    }
+    return status;
+}
 async function pelaFonte(pasta, log) {
     const git = (args, tempo = 15000) => roda('git', ['-C', pasta, ...args], pasta, tempo);
     try { await git(['rev-parse', '--is-inside-work-tree']); } catch (e) { return { motivo: 'não é um clone do git' }; }
-    if (await git(['status', '--porcelain', '--untracked-files=no']).catch(() => 'erro')) return { motivo: 'há alterações locais (não puxa para não mexer nelas)' };
+    const locais = await alteracoesLocais(git, log);
+    if (locais) return { motivo: 'há alterações locais (não puxa para não mexer nelas): ' + locais.split(/\r?\n/).map(l => l.trim().replace(/^\S+\s+/, '')).slice(0, 5).join(', ') };
     try { await git(['rev-parse', '--abbrev-ref', '@{u}']); } catch (e) { return { motivo: 'a branch não segue nenhuma do GitHub' }; }
     try { await git(['fetch', '--quiet'], 20000); } catch (e) { return { motivo: 'sem acesso ao GitHub agora' }; }
     const faltam = Number(await git(['rev-list', '--count', 'HEAD..@{u}']).catch(() => '0')) || 0;
@@ -48,7 +60,7 @@ async function pelaFonte(pasta, log) {
 async function atrasoFonte(pasta) {
     const git = (args, tempo = 15000) => roda('git', ['-C', pasta, ...args], pasta, tempo);
     try {
-        if (await git(['status', '--porcelain', '--untracked-files=no'])) return 0;
+        if (await alteracoesLocais(git)) return 0;
         await git(['rev-parse', '--abbrev-ref', '@{u}']);
         await git(['fetch', '--quiet'], 20000);
         return Number(await git(['rev-list', '--count', 'HEAD..@{u}'])) || 0;

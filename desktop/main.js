@@ -11,7 +11,9 @@ const net = require('net');
 // Empacotado (Red Code.exe): dados, logs e ícone ficam em %APPDATA%\Red Code, fora da pasta do
 // programa (que é trocada inteira a cada versão nova). Rodando pela pasta do projeto, nada muda.
 const EMPACOTADO = app.isPackaged;
-if (EMPACOTADO && !app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', path.join(app.getPath('appData'), 'Red Code'));
+// Exe e clone (electron.exe sem --user-data-dir) usam a mesma pasta: senão o clone abre em Roaming\Electron, sem o tema e
+// as preferências da pessoa
+if (!app.commandLine.hasSwitch('user-data-dir')) app.setPath('userData', path.join(app.getPath('appData'), 'Red Code'));
 const PASTA_DADOS = EMPACOTADO ? app.getPath('userData') : __dirname;
 if (EMPACOTADO) { fs.mkdirSync(PASTA_DADOS, { recursive: true }); process.env.PAINEL_DADOS = PASTA_DADOS; }
 const navegador = require('./navegador');
@@ -171,10 +173,26 @@ function sobeServidor() {
     });
     atualizaBandeja();
 }
+// Versão deste app (exe: a do pacote; clone: a do package.json da pasta)
+function versaoDoApp() {
+    if (EMPACOTADO) return app.getVersion();
+    try { return JSON.parse(fs.readFileSync(path.join(PASTA, 'package.json'), 'utf8')).version || ''; } catch (e) { return ''; }
+}
+// Anexando a um servidor que já responde na porta: se ele é de uma versão mais velha (ex.: um clone parado na 1.0.3
+// aberto antes do exe 1.0.5), a tela nova não funciona direito com ele. Avisa e pede para ele se encerrar quando
+// estiver livre; o vigia do modo anexado sobe o servidor do app em seguida
+function confereVersaoAnexado(resposta) {
+    const dele = resposta && resposta.dados && resposta.dados.versaoApp || '';
+    const minha = versaoDoApp();
+    if (!minha || (dele && !atualizacao.maisNova(minha, dele))) return;
+    registra(`anexar: o servidor da porta ${PORTA} é da versão ${dele || 'antiga (sem número)'} e o app é da ${minha}; pedindo para ele sair`);
+    assumeServidor(true);
+    if (bandeja && bandeja.displayBalloon) bandeja.displayBalloon({ title: 'Red Code', content: `Outro Red Code (versão ${dele || 'antiga'}) está usando a porta ${PORTA}. Este (${minha}) assume assim que ele estiver livre; para ser já, feche o outro.` });
+}
 // Antes de subir: se outro painel já responde na porta, só anexa (não disputa a porta)
 async function tentaSubirOuAnexar() {
     const outro = await pede('/api/versao', 1500);
-    if (outro && outro.ok) { viraAnexado(); recarrega(); return; }
+    if (outro && outro.ok) { viraAnexado(); confereVersaoAnexado(outro); recarrega(); return; }
     if (!(await portaLivre())) { await espera(1000); return tentaSubirOuAnexar(); }
     sobeServidor();
     if (await esperaServidor()) recarrega();
@@ -648,7 +666,7 @@ app.whenReady().then(async () => {
     controleNavegador = await navegador.iniciaControle({ icone: icone(256), avisa: () => atualizaBandeja(), proibirPortas: [...new Set([PORTA, 4317])] });
     // Porta já ocupada por um painel? Só abre a janela nele (modo anexar)
     const existente = await pede('/api/versao', 1500);
-    if (existente && existente.ok) viraAnexado();
+    if (existente && existente.ok) { viraAnexado(); confereVersaoAnexado(existente); }
     else {
         // Rodando pelo código: puxa o que há de novo no GitHub antes de subir o servidor
         passoSplash('Procurando atualizações…');
