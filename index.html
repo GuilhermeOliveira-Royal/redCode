@@ -1468,6 +1468,28 @@ details[open]::details-content { block-size: auto; }
 .codigo pre { transition: max-height .3s var(--entrada); }
 /* Janelas, menu e imagem ampliada entram com fade e um leve zoom */
 .ajuda:not([hidden]) { animation: fundo-entra .18s ease-out; }
+/* Carregando ao abrir: estrela girando devagar e barrinha indo e voltando, até a lista de conversas chegar */
+.carregando-inicio { position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; justify-items: center; gap: 16px; background: var(--papel); transition: opacity .3s ease; }
+.carregando-inicio.saindo { opacity: 0; pointer-events: none; }
+.carregando-inicio .ci-estrela { animation: ciGira 2.4s cubic-bezier(.5, .1, .5, .9) infinite; }
+.carregando-inicio .ci-barra { position: relative; width: 140px; height: 3px; border-radius: 3px; overflow: hidden; background: color-mix(in srgb, var(--voce) 18%, transparent); }
+.carregando-inicio .ci-barra span { position: absolute; top: 0; bottom: 0; width: 40%; border-radius: 3px; background: var(--voce); animation: ciBarra 1.1s ease-in-out infinite; }
+.carregando-inicio .ci-texto { color: var(--grafite); font-size: 13px; }
+@keyframes ciGira { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(.92); } 100% { transform: rotate(360deg) scale(1); } }
+@keyframes ciBarra { 0% { left: -40%; } 100% { left: 100%; } }
+/* Novidades ao atualizar: versões empilhadas, a mais nova em cima */
+.ajuda .caixa.novidades { width: min(560px, 94vw); padding: 22px 24px 18px; }
+.novidades .nov-topo { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.novidades .nov-topo h2 { margin: 0; }
+.novidades .nov-topo small { display: block; color: var(--grafite); font-size: 12px; margin-top: 2px; }
+.novidades .nov-ic { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px; background: var(--voce); color: #fff; }
+.novidades .nov-versao { margin: 0 0 14px; }
+.novidades .nov-versao h3 { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px; font: 600 13px var(--sans); }
+.novidades .nov-versao h3 span { color: var(--grafite); font-weight: 400; font-size: 12px; }
+.novidades ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.45; }
+.novidades li::marker { color: var(--voce); }
+.novidades .nov-rodape { display: flex; justify-content: flex-end; margin-top: 6px; }
+.novidades .nov-rodape button { padding: 7px 16px; border-radius: 8px; background: var(--voce); color: #fff; font: 600 13px var(--sans); }
 .ajuda:not([hidden]) > .caixa { animation: surgir .24s var(--entrada); }
 .lupa:not([hidden]) { animation: fundo-entra .2s ease-out; }
 .lupa:not([hidden]) img { animation: surgir .26s var(--entrada); }
@@ -1632,6 +1654,32 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .cartao-atualizacao .ca-prog { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--voce); transition: width .4s ease; }
 .cartao-atualizacao.erro { border-color: color-mix(in srgb, var(--erro) 55%, var(--linha)); background: color-mix(in srgb, var(--erro) 10%, var(--folha)); }
 .player-midia .pm-capa { width: 36px; height: 36px; flex: none; border-radius: 7px; object-fit: cover; background: var(--realce); }
+/* Fechado: o disco é só a capa; os extras do aberto ficam escondidos */
+.player-midia .pm-disco { position: relative; flex: none; display: grid; place-items: center; }
+.player-midia .pm-furo, .player-midia .pm-tempo, .player-midia .pm-btn.pm-so-aberto { display: none; }
+.player-midia .pm-botoes { flex: none; display: flex; align-items: center; }
+/* Aberto (mouse em cima): a capa vira um vinil girando, nome inteiro, tempo e o botão de anterior */
+.player-midia.aberto { display: grid; grid-template-columns: 84px 1fr; grid-template-areas: "disco textos" "disco botoes"; column-gap: 11px; row-gap: 4px; align-items: center; padding: 10px 8px 10px 9px; box-shadow: 0 10px 28px color-mix(in srgb, var(--tinta) 14%, transparent); animation: pmAbre .28s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pmAbre { from { opacity: .55; transform: translateY(6px) scale(.98); } }
+.player-midia.aberto .pm-disco { grid-area: disco; width: 84px; height: 84px; border-radius: 50%; background: radial-gradient(circle, #232323 0 30%, #111 31% 33%, #1c1c1c 34% 46%, #111 47% 49%, #1d1d1d 50% 100%); box-shadow: 0 6px 16px #0005; animation: pmGira 7s linear infinite, pmDiscoEntra .35s cubic-bezier(.2, .8, .2, 1); }
+.player-midia.aberto.pausado .pm-disco { animation-play-state: paused; }
+@keyframes pmGira { to { transform: rotate(360deg); } }
+@keyframes pmDiscoEntra { from { scale: .5; opacity: 0; } }
+.player-midia.aberto .pm-capa { width: 48px; height: 48px; border-radius: 50%; }
+.player-midia.aberto .pm-capa.sem { background: #2b2b2b; color: #bbb; }
+.player-midia.aberto .pm-furo { display: block; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--folha); box-shadow: 0 0 0 1px #0004; }
+.player-midia.aberto .pm-textos { grid-area: textos; align-self: end; }
+.player-midia.aberto .pm-titulo { white-space: normal; font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.player-midia.aberto .pm-artista { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.player-midia.aberto .pm-tempo { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 10.5px; color: var(--grafite); font-variant-numeric: tabular-nums; }
+.player-midia.aberto.sem-tempo .pm-tempo { display: none; }
+.player-midia .pm-trilho { flex: 1; height: 4px; border-radius: 4px; background: var(--realce); overflow: hidden; }
+.player-midia .pm-trilho i { display: block; width: 0; height: 100%; border-radius: 4px; background: var(--voce); transition: width 1s linear; }
+.player-midia.aberto .pm-botoes { grid-area: botoes; align-self: start; gap: 2px; }
+.player-midia.aberto .pm-btn.pm-so-aberto { display: grid; }
+.player-midia.aberto [data-midia="alternar"] { width: 32px; height: 32px; border-radius: 50%; background: var(--voce); color: #fff; }
+.player-midia.aberto [data-midia="alternar"]:hover { background: var(--voce); filter: brightness(1.1); }
+.player-midia.aberto .pm-prog { display: none; }
 .player-midia .pm-capa.sem { display: grid; place-items: center; color: var(--grafite); }
 .player-midia .pm-textos { flex: 1; min-width: 0; }
 .player-midia .pm-titulo { font: 600 12.5px/1.25 var(--sans); color: var(--tinta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1707,7 +1755,7 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe.redimensionando { user-select: none; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
 /* Com o vídeo encaixado acima do player, o cartão de uso sobe junto */
-body.com-player .uso-plano:not(.minimizado) { bottom: calc(116px + var(--altura-video, 0px)); transition: bottom .45s cubic-bezier(.2, .8, .2, 1); }
+body.com-player .uso-plano:not(.minimizado) { bottom: calc(116px + var(--altura-video, 0px) + var(--player-aberto, 0px)); transition: bottom .3s cubic-bezier(.2, .8, .2, 1); }
 .chip-perfil .perfil-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-perfil .perfil-seta { color: var(--atencao); white-space: nowrap; }
 .chip-perfil.pendente { border-color: var(--atencao); animation: perfilPisca 1.6s ease-in-out infinite; }
@@ -2085,6 +2133,11 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 <script src="/clipe.js"></script>
 </head>
 <body>
+<div class="carregando-inicio" id="carregandoInicio" role="status" aria-live="polite">
+    <img class="ci-estrela" src="/favicon.svg" alt="" width="56" height="56">
+    <div class="ci-barra"><span></span></div>
+    <div class="ci-texto" id="carregandoInicioTexto">Carregando suas conversas…</div>
+</div>
 <div class="layout">
     <nav class="sessoes" aria-label="Sessões">
         <div class="marca"><strong class="logo" title="Red Code" aria-label="Red Code"><svg width="26" height="26" viewBox="-1.15 -1.15 2.3 2.3" aria-hidden="true"><g stroke="currentColor" stroke-width="0.22" stroke-linecap="round"><line x1="0" y1="0" x2="0.990" y2="0.139"/><line x1="0" y1="0" x2="0.595" y2="0.535"/><line x1="0" y1="0" x2="0.227" y2="0.912"/><line x1="0" y1="0" x2="-0.103" y2="0.733"/><line x1="0" y1="0" x2="-0.602" y2="0.669"/><line x1="0" y1="0" x2="-0.796" y2="0.198"/><line x1="0" y1="0" x2="-0.990" y2="-0.139"/><line x1="0" y1="0" x2="-0.572" y2="-0.515"/><line x1="0" y1="0" x2="-0.223" y2="-0.893"/><line x1="0" y1="0" x2="0.100" y2="-0.713"/><line x1="0" y1="0" x2="0.589" y2="-0.654"/><line x1="0" y1="0" x2="0.815" y2="-0.203"/></g><circle r="0.15" fill="currentColor"/></svg></strong>
@@ -2416,6 +2469,9 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
         </div>
     </form>
 </div>
+<div class="ajuda" id="janelaNovidades" hidden>
+    <div class="caixa novidades" role="dialog" aria-modal="true" aria-labelledby="tituloNovidades"></div>
+</div>
 <div class="ajuda" id="ajuda" hidden>
     <div class="caixa" role="dialog" aria-modal="true" aria-labelledby="tituloAjuda">
         <h2 id="tituloAjuda">Atalhos de teclado</h2>
@@ -2720,6 +2776,7 @@ const ICONE_MIDIA = {
     play: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M4.5 2.8v10.4c0 .5.6.8 1 .5l8-5.2a.6.6 0 0 0 0-1L5.5 2.3c-.4-.3-1 0-1 .5z"/></svg>',
     pausa: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>',
     proxima: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2.5 3.2v9.6c0 .5.5.8.9.5L10 8.5a.6.6 0 0 0 0-1L3.4 2.7c-.4-.3-.9 0-.9.5z"/><rect x="11.2" y="2.6" width="2.3" height="10.8" rx=".9"/></svg>',
+    anterior: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.5 3.2v9.6c0 .5-.5.8-.9.5L6 8.5a.6.6 0 0 1 0-1l6.6-4.8c.4-.3.9 0 .9.5z"/><rect x="2.5" y="2.6" width="2.3" height="10.8" rx=".9"/></svg>',
     nota: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 12.2a2 2 0 1 1-1.2-1.8V3.6l7.5-1.5v8.1a2 2 0 1 1-1.2-1.8V4.1L6 5.1z"/></svg>',
     video: '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2"/><path d="M6.6 6v4l3.6-2z" fill="currentColor"/></svg>',
     soltar: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 8 8"/><path d="M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg>',
@@ -2730,11 +2787,15 @@ let midiaAtual = null, capaMostrada = -1, semMidiaDesde = 0;
 // "Brave._crx_..." / "Spotify.exe" / "Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic" -> nome curto do app
 const nomeAppMidia = (id) => { const n = String(id || '').split(/[.!_]/)[0]; return n ? n[0].toUpperCase() + n.slice(1) : ''; };
 function montaPlayer() {
-    playerMidia.innerHTML = `<span class="pm-capa sem">${ICONE_MIDIA.nota}</span>
-        <div class="pm-textos"><div class="pm-titulo"><span class="pm-rola"></span></div><div class="pm-artista"><span class="pm-rola"></span></div></div>
-        <button type="button" class="pm-btn" data-midia-clipe hidden title="Ver o vídeo no canto" aria-label="Ver o vídeo no canto">${ICONE_MIDIA.video}</button>
-        <button type="button" class="pm-btn" data-midia="alternar"></button>
-        <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
+    playerMidia.innerHTML = `<span class="pm-disco"><span class="pm-capa sem">${ICONE_MIDIA.nota}</span><span class="pm-furo"></span></span>
+        <div class="pm-textos"><div class="pm-titulo"><span class="pm-rola"></span></div><div class="pm-artista"><span class="pm-rola"></span></div>
+            <div class="pm-tempo"><span class="pm-t-ini">0:00</span><span class="pm-trilho"><i></i></span><span class="pm-t-fim">0:00</span></div></div>
+        <div class="pm-botoes">
+            <button type="button" class="pm-btn" data-midia-clipe hidden title="Ver o vídeo no canto" aria-label="Ver o vídeo no canto">${ICONE_MIDIA.video}</button>
+            <button type="button" class="pm-btn pm-so-aberto" data-midia="anterior" title="Música anterior" aria-label="Música anterior">${ICONE_MIDIA.anterior}</button>
+            <button type="button" class="pm-btn" data-midia="alternar"></button>
+            <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
+        </div>
         <span class="pm-prog"></span>`;
 }
 let avisoMidiaDispensado = false;
@@ -2779,6 +2840,7 @@ function desenhaMidia() {
     alternar.setAttribute('aria-label', alternar.title);
     alternar.disabled = m.podeAlternar === false;
     playerMidia.querySelector('[data-midia="proxima"]').disabled = m.podeProxima === false;
+    playerMidia.classList.toggle('sem-tempo', !(m.duracao > 1));
     // Vídeo no canto: só no app desktop e quando o som não vem de um app só de música
     const botaoClipe = playerMidia.querySelector('[data-midia-clipe]');
     botaoClipe.hidden = !SUPORTA_CLIPE || SO_AUDIO.test(m.app || '');
@@ -2796,7 +2858,12 @@ function andaProgresso() {
     const base = m.atualizadoEm > 0 ? m.atualizadoEm : m.lidoEm;
     const pos = m.posicao + (m.estado === 'Playing' ? Math.max(0, (Date.now() - base) / 1000) : 0);
     barra.hidden = false;
-    barra.style.width = Math.min(100, Math.max(0, pos / m.duracao * 100)).toFixed(2) + '%';
+    const p = Math.min(100, Math.max(0, pos / m.duracao * 100)).toFixed(2) + '%';
+    barra.style.width = p;
+    // Aberto (mouse em cima): tempo andado, total e a trilha
+    const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+    const ini = playerMidia.querySelector('.pm-t-ini'), fim = playerMidia.querySelector('.pm-t-fim'), trilho = playerMidia.querySelector('.pm-trilho i');
+    if (ini) { ini.textContent = mmss(Math.min(pos, m.duracao)); fim.textContent = mmss(m.duracao); trilho.style.width = p; }
 }
 // Mouse em cima: o título da música, se não cabe, desliza até o fim, pausa e volta (o tempo cresce com o tamanho)
 function rolaTextosPlayer(ligar) {
@@ -2812,8 +2879,22 @@ function rolaTextosPlayer(ligar) {
         linha.classList.add('rolando');
     }
 }
-playerMidia.addEventListener('mouseenter', () => rolaTextosPlayer(true));
-playerMidia.addEventListener('mouseleave', () => rolaTextosPlayer(false));
+let abrePlayerEm = null, alturaPlayerFechado = 0;
+new ResizeObserver(() => {
+    const h = playerMidia.offsetHeight;
+    if (!playerMidia.classList.contains('aberto')) { alturaPlayerFechado = h; document.body.style.setProperty('--player-aberto', '0px'); }
+    else if (alturaPlayerFechado) document.body.style.setProperty('--player-aberto', Math.max(0, h - alturaPlayerFechado) + 'px');
+}).observe(playerMidia);
+playerMidia.addEventListener('mouseenter', () => {
+    rolaTextosPlayer(true);
+    clearTimeout(abrePlayerEm);
+    abrePlayerEm = setTimeout(() => { if (playerMidia.classList.contains('aviso-midia')) return; rolaTextosPlayer(false); playerMidia.classList.add('aberto'); andaProgresso(); }, 220);
+});
+playerMidia.addEventListener('mouseleave', () => {
+    rolaTextosPlayer(false);
+    clearTimeout(abrePlayerEm);
+    abrePlayerEm = setTimeout(() => playerMidia.classList.remove('aberto'), 300);
+});
 async function atualizaMidia() {
     if (document.hidden || JANELA_SECUNDARIA) return;
     let m;
@@ -4612,6 +4693,15 @@ function faixaData(ms) {
     return 'Mais antigas';
 }
 
+// Carregando ao abrir: fica até a primeira lista de conversas chegar; demorando, diz o que está esperando
+let carregouInicio = false;
+function tiraCarregandoInicio() {
+    const c = document.getElementById('carregandoInicio');
+    if (!c || c.classList.contains('saindo')) return;
+    c.classList.add('saindo');
+    setTimeout(() => c.remove(), 350);
+}
+setTimeout(() => { if (!carregouInicio && document.getElementById('carregandoInicioTexto')) document.getElementById('carregandoInicioTexto').textContent = 'Ainda carregando… o servidor está demorando para responder'; }, 12000);
 async function carregaSessoes() {
     if (editandoNome) return;
     const [sessoes, dados] = await Promise.all([
@@ -4620,6 +4710,8 @@ async function carregaSessoes() {
     ]);
     todasSessoes = sessoes;
     dadosPainel = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], ...dados };
+    // Primeira lista chegou: o carregando sai depois que ela estiver desenhada
+    if (!carregouInicio) { carregouInicio = true; requestAnimationFrame(() => requestAnimationFrame(tiraCarregandoInicio)); }
     if (sessaoAtual && document.visibilityState === 'visible') marcaVista(sessaoAtual);
     // Janela secundária (conversa aberta em outra janela) não avisa: a principal já avisa
     if (!JANELA_SECUNDARIA) verificaAvisos(sessoes);
@@ -4771,10 +4863,15 @@ async function abreSessao(chave, { daNova = false } = {}) {
 
 async function atualizaSessao(forcar) {
     if (!sessaoAtual || iniciando) return;
-    const [projeto, id] = sessaoAtual.split('/');
+    // De qual conversa é este pedido: se a pessoa trocar de conversa antes da resposta chegar (comum com o Claude
+    // rodando, que deixa a resposta grande e lenta), a resposta velha é jogada fora em vez de redesenhar a conversa anterior
+    const chave = sessaoAtual;
+    const [projeto, id] = chave.split('/');
     const resposta = await fetch(`/api/sessao/${encodeURIComponent(projeto)}/${encodeURIComponent(id)}`).catch(() => null);
+    if (sessaoAtual !== chave || iniciando) return;
     if (!resposta || !resposta.ok) return false;
     const texto = await resposta.text();
+    if (sessaoAtual !== chave || iniciando) return;
     if (texto === ultimoJson && !forcar) return;
     ultimoJson = texto;
     const dados = JSON.parse(texto);
@@ -6167,6 +6264,7 @@ const SECOES_CONFIG = {
         return '<h3 class="config-titulo">Sistema</h3>'
             + linhaConfig('Atualizações', temAtualizacao ? 'O Red Code já confere sozinho ao abrir e de tempos em tempos. Aqui confere agora; se tiver versão nova, aparece o cartão para atualizar acima do player.' : 'Só no app do Red Code.',
                 `<button class="mini" data-config-acao="atualizacoes" ${temAtualizacao ? '' : 'disabled'}>Buscar atualizações</button>`, 'atualizar versao nova release')
+            + linhaConfig('Novidades', 'O que entrou na última atualização que você baixou. Aparece sozinho na primeira abertura depois de atualizar.', '<button class="mini" data-config-acao="novidades">Ver novidades</button>', 'changelog novidades versao o que mudou')
             + linhaConfig('Avisos no Windows', 'Avisa quando uma conversa termina ou faz uma pergunta. É o mesmo sino do topo da lista.', chaveConfig('avisos', notificar), 'notificacoes sino')
             + linhaConfig('Iniciar com o Windows', temInicio ? 'Abre o Red Code escondido na bandeja ao entrar no Windows.' : 'Só no app do Red Code (depois de fechar e abrir o app com esta versão).', chaveConfig('inicio', inicio, !temInicio), 'bandeja');
     },
@@ -6289,6 +6387,7 @@ janelaConfig.addEventListener('click', async (evt) => {
         else { const g = atalhosGravados(); delete g[id]; gravaPref('atalhos', JSON.stringify(g)); }
         return abreConfig('atalhos');
     }
+    if (acao && acao.dataset.configAcao === 'novidades') { janelaConfig.hidden = true; return mostraNovidades(true); }
     if (acao && acao.dataset.configAcao === 'atualizacoes') {
         const texto = acao.textContent;
         acao.disabled = true; acao.textContent = 'Procurando…';
@@ -7496,6 +7595,7 @@ document.addEventListener('keydown', (ev) => {
         if (!ajuda.hidden) { ajuda.hidden = true; return; }
         if (!janelaNova.hidden) { janelaNova.hidden = true; return; }
         if (!janelaAlteracoes.hidden) { janelaAlteracoes.hidden = true; return; }
+        if (!document.getElementById('janelaNovidades').hidden) { document.getElementById('janelaNovidades').hidden = true; return; }
         if (!document.getElementById('menuSumario').hidden) { document.getElementById('menuSumario').hidden = true; return; }
         if (document.activeElement.id === 'procuraSessao' || procura) {
             procura = '';
@@ -9079,6 +9179,43 @@ for (const b of document.querySelectorAll('.trilho-lista [data-espelha]')) {
     new MutationObserver(copia).observe(original, { attributes: true, attributeFilter: ['aria-pressed'] });
 }
 
+/* ---------- Novidades ao atualizar (novidades.js): modal na primeira abertura de cada versão nova ---------- */
+const janelaNovidades = document.getElementById('janelaNovidades');
+const partesVersao = (v) => String(v || '').replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+function comparaVersao(a, b) { const x = partesVersao(a), y = partesVersao(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; }
+const ICONE_NOVIDADES = '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2.5l1.9 4.6 4.6 1.9-4.6 1.9L10 15.5l-1.9-4.6L3.5 9l4.6-1.9z"/><path d="M15.5 14v3.5M13.75 15.75h3.5"/></svg>';
+// Mostra as versões da última atualização baixada: as que vieram depois da versão que estava instalada antes.
+// manual = botão de Configurações (mostra de novo a última atualização); senão, só se a versão ainda não foi vista
+async function mostraNovidades(manual) {
+    const todas = manual;
+    let d;
+    try { d = await getPainel('/api/novidades'); } catch (e) { if (todas) recado('Não deu para ler as novidades: ' + e.message); return; }
+    const atual = d.versaoApp, vista = lePref('novidadesVistas', '');
+    if (!atual || !Array.isArray(d.versoes)) return;
+    // De qual versão veio: a vista antes desta (na primeira vez com o recurso, ninguém sabe: mostra só a atual)
+    const jaVista = vista && comparaVersao(vista, atual) >= 0;
+    if (jaVista && !manual) return;
+    const desde = jaVista ? lePref('novidadesDesde', '') : vista;
+    const lista = d.versoes.filter(v => comparaVersao(v.versao, atual) <= 0 && (desde ? comparaVersao(v.versao, desde) > 0 : comparaVersao(v.versao, atual) === 0));
+    // Só fica "vista" ao fechar (a página pode recarregar logo depois de abrir, quando o servidor sobe)
+    if (!lista.length) { if (!manual) gravaPref('novidadesVistas', atual); else recado('Sem novidades registradas para a versão ' + atual); return; }
+    janelaNovidades.dataset.desde = desde || '';
+    const data = (iso) => { const p = String(iso || '').split('-'); return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : ''; };
+    // "Título: texto" vira título em negrito
+    const item = (t) => { const i = String(t).indexOf(': '); return i > 0 && i < 60 ? `<li><b>${esc(t.slice(0, i))}:</b> ${esc(t.slice(i + 2))}</li>` : `<li>${esc(t)}</li>`; };
+    janelaNovidades.firstElementChild.innerHTML = `<div class="nov-topo"><span class="nov-ic">${ICONE_NOVIDADES}</span><div><h2 id="tituloNovidades">${todas ? 'Novidades da última atualização' : 'O Red Code foi atualizado'}</h2><small>${desde ? 'Da versão ' + esc(desde) + ' para a ' + esc(atual) : 'Versão ' + esc(atual)}. O que entrou:</small></div></div>`
+        + lista.map(v => `<section class="nov-versao"><h3>Versão ${esc(v.versao)} <span>${esc(data(v.data))}</span></h3><ul>${(v.itens || []).map(item).join('')}</ul></section>`).join('')
+        + '<div class="nov-rodape"><button type="button" data-fechar-novidades>Entendi</button></div>';
+    janelaNovidades.dataset.versao = atual;
+    janelaNovidades.hidden = false;
+    janelaNovidades.querySelector('[data-fechar-novidades]').focus();
+}
+janelaNovidades.addEventListener('click', (ev) => { if (ev.target === janelaNovidades || ev.target.closest('[data-fechar-novidades]')) janelaNovidades.hidden = true; });
+// Fechou (Entendi, clique fora ou Esc): a versão fica vista
+new MutationObserver(() => { if (janelaNovidades.hidden && janelaNovidades.dataset.versao) { if (lePref('novidadesVistas', '') !== janelaNovidades.dataset.versao) gravaPref('novidadesDesde', janelaNovidades.dataset.desde || ''); gravaPref('novidadesVistas', janelaNovidades.dataset.versao); delete janelaNovidades.dataset.versao; } }).observe(janelaNovidades, { attributes: true, attributeFilter: ['hidden'] });
+// Só na janela principal, um pouco depois de abrir (a tela termina de montar antes)
+if (!JANELA_SECUNDARIA) setTimeout(() => mostraNovidades(false), 1500);
+
 /* ---------- Atalhos de teclado: um registro só, trocável em Configurações › Atalhos ---------- */
 // Guardados como "Ctrl+Alt+Shift+Tecla" pela tecla física (evt.code), então valem igual em teclado ABNT e americano
 const ATALHOS = [
@@ -9123,10 +9260,9 @@ function alternaVideoCanto() {
     if (lePref('clipe', '') === 'solto' && !clipePip) {
         new BroadcastChannel('redcode-clipe').postMessage({ tipo: 'fecha-janela' });
         gravaPref('clipe', '');
-        recado('Vídeo fechado');
         return desenhaMidia();
     }
-    if (clipePip) { fechaPip(true); recado('Vídeo fechado'); }
+    if (clipePip) fechaPip(true);
     else { abrePip(); if (playerMidia.hidden) recado('Vídeo ligado: aparece quando alguma música estiver tocando'); }
     desenhaMidia();
 }

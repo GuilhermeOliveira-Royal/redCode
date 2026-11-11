@@ -2608,6 +2608,13 @@ const servidor = http.createServer(async (req, res) => {
                 return responde(res, 200, dados.visualPets);
             } catch (e) { return responde(res, 400, { erro: e.message }); }
         }
+        if (url.pathname === '/api/novidades' && req.method === 'GET') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            let versoes = [], versaoApp = '';
+            try { delete require.cache[require.resolve('./novidades')]; versoes = require('./novidades'); } catch (e) { /* sem arquivo */ }
+            try { versaoApp = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version || ''; } catch (e) { /* sem package.json */ }
+            return responde(res, 200, { versaoApp, versoes });
+        }
         if (url.pathname === '/api/midia') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
             // Com ?versao=: segura a resposta até o estado mudar (play/pausa de fora aparece na hora, sem esperar a próxima pergunta)
