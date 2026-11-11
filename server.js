@@ -1914,11 +1914,35 @@ function gravaPlugin(nome, ligado) {
     return pasta;
 }
 
+// Economia de tokens: compactação automática da conversa (autoCompactWindow no settings.json)
+const JANELA_ECONOMIA = 150000;
+function leEconomia() {
+    try { return Number(JSON.parse(fs.readFileSync(ARQ_SETTINGS, 'utf8')).autoCompactWindow) > 0; } catch (e) { return false; }
+}
+function gravaEconomia(ligada) {
+    const existe = fs.existsSync(ARQ_SETTINGS);
+    const bruto = existe ? fs.readFileSync(ARQ_SETTINGS, 'utf8') : '{}';
+    const json = JSON.parse(bruto);
+    if (existe) {
+        const d = new Date(), z = (n) => String(n).padStart(2, '0');
+        const pasta = path.join(PASTA_CLAUDE, 'backups', `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}-${z(d.getMinutes())}-${z(d.getSeconds())}`);
+        fs.mkdirSync(pasta, { recursive: true });
+        fs.writeFileSync(path.join(pasta, 'settings.json'), bruto);
+    }
+    if (ligada) json.autoCompactWindow = JANELA_ECONOMIA; else delete json.autoCompactWindow;
+    const crlf = bruto.includes('\r\n');
+    let novo = JSON.stringify(json, null, 2);
+    if (!existe || /\r?\n$/.test(bruto)) novo += '\n';
+    if (crlf) novo = novo.replace(/\n/g, '\r\n');
+    fs.mkdirSync(PASTA_CLAUDE, { recursive: true });
+    fs.writeFileSync(ARQ_SETTINGS, novo);
+}
+
 async function rotaChat(req, res, url) {
     if (url.pathname === '/api/versao' && req.method === 'GET') return responde(res, 200, versaoServidor());
     if (url.pathname === '/api/chat/estado' && req.method === 'GET') return responde(res, 200, chat.estado());
     if (url.pathname === '/api/projetos' && req.method === 'GET') return responde(res, 200, listaProjetos());
-    if (url.pathname === '/api/dados' && req.method === 'GET') return responde(res, 200, { ...leDados(), chatProjeto: chat.pastaDoProjeto(chat.CHAT_DIR), usuario: nomeUsuario() });
+    if (url.pathname === '/api/dados' && req.method === 'GET') return responde(res, 200, { ...leDados(), chatProjeto: chat.pastaDoProjeto(chat.CHAT_DIR), usuario: nomeUsuario(), economia: leEconomia() });
     if (url.pathname.startsWith('/api/git/')) {
         if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
         const cwd = req.method === 'GET' ? url.searchParams.get('cwd') : null;
@@ -2196,6 +2220,10 @@ async function rotaChat(req, res, url) {
         dados.navegador = corpo.navegador;
         gravaDados(dados);
         return responde(res, 200, { ok: true });
+    }
+    if (url.pathname === '/api/economia') {
+        try { gravaEconomia(!!corpo.ligada); return responde(res, 200, { ok: true, economia: leEconomia() }); }
+        catch (e) { return responde(res, 500, { erro: 'Não deu para gravar o settings.json: ' + e.message }); }
     }
     if (url.pathname === '/api/chat/modo') {
         if (!chat.MODOS.includes(corpo.modo)) return responde(res, 400, { erro: 'modo inválido' });

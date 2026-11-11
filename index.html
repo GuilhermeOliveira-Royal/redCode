@@ -6107,6 +6107,8 @@ const SECOES_CONFIG = {
             + linhaConfig('Visual das conversas de código', '', opcoesConfig('visualCodigo', Object.entries(VISUAIS_CODIGO), visualCodigo), 'editor ao vivo')
             + linhaConfig('Mostrar o código formatado', 'Como o Alt+Shift+F do VS Code (só visualização: o arquivo não muda).', chaveConfig('formatado', ev.formatado))
             + linhaConfig('Quebra de linha no editor', 'Atalho: Alt+Z.', chaveConfig('quebra', quebraLinha))
+            + '<h3 class="config-titulo">Economia de tokens</h3>'
+            + linhaConfig('Compactar a conversa sozinho', 'Quando a conversa passa de cerca de 150 mil tokens, o Claude resume o que veio antes e segue com o resumo, em vez de reenviar tudo a cada mensagem. Gasta menos e evita estourar o limite; em troca, detalhes antigos podem se perder no resumo. Vale para conversas novas ou retomadas (e também para o VS Code, pois fica no settings.json do Claude). Desligado, o Claude usa o padrão dele. Para compactar na hora, clique na bolinha de contexto da conversa.', chaveConfig('economia', !!dados.economia), 'economizar tokens compactar contexto')
             + '<h3 class="config-titulo">Pastas extras</h3>'
             + `<div class="config-linha" data-busca="pastas extras projetos lista"><div class="config-rotulo" style="flex:1"><b>Pastas na lista de projetos</b>
                 <small>Aparecem ao começar uma conversa nova, no grupo "Suas pastas". Não liberam o editor nem o git sem uma conversa na pasta.</small>
@@ -6206,6 +6208,11 @@ janelaConfig.addEventListener('change', async (evt) => {
     }
     const chave = alvo.dataset.configChave;
     if (chave === 'formatado') { if (alvo.checked !== ev.formatado) alternaFormatado(); return; }
+    if (chave === 'economia') {
+        try { await api('/api/economia', { ligada: alvo.checked }); recado(alvo.checked ? 'Compactação automática ligada' : 'Compactação automática desligada'); }
+        catch (e) { alvo.checked = !alvo.checked; recado(e.message); }
+        return;
+    }
     if (chave === 'quebra') { defineQuebra(alvo.checked); return recado(alvo.checked ? 'Quebra de linha ligada' : 'Quebra de linha desligada'); }
     if (chave === 'avisos') {
         // O sino do topo cuida da permissão do Windows; aqui só reflete o resultado
