@@ -336,8 +336,12 @@ function protegeJanela(win) {
             // Vídeo desanexado: janela sem moldura, sempre por cima das outras (como o picture-in-picture do navegador)
             // Nasce já no lugar (mover entre telas com zoom diferente depois de criada muda o tamanho)
             const area = screen.getDisplayMatching(win.getBounds()).workArea;
+            // Arrastado para fora do Red Code: nasce onde foi solto, do tamanho que tinha; senão, no canto da tela
+            const pedida = posicaoClipe && Date.now() - posicaoClipe.em < 5000 ? posicaoClipe : null;
+            posicaoClipe = null;
+            const lugar = pedida || { x: area.x + area.width - 480 - 24, y: area.y + area.height - 270 - 24, width: 480, height: 270 };
             return { action: 'allow', overrideBrowserWindowOptions: {
-                x: area.x + area.width - 480 - 24, y: area.y + area.height - 270 - 24, width: 480, height: 270, minWidth: 192, minHeight: 108, frame: false, alwaysOnTop: true, title: 'Vídeo · Red Code', icon: icone(256), backgroundColor: '#000000', autoHideMenuBar: true, webPreferences: PREFERENCIAS_WEB(),
+                x: lugar.x, y: lugar.y, width: lugar.width, height: lugar.height, minWidth: 192, minHeight: 108, frame: false, alwaysOnTop: true, title: 'Vídeo · Red Code', icon: icone(256), backgroundColor: '#000000', autoHideMenuBar: true, webPreferences: PREFERENCIAS_WEB(),
             } };
         }
         abreFora(url);
@@ -402,6 +406,21 @@ ipcMain.handle('painel:abrir-logs', async (ev) => {
 
 // ---------- Vídeo da mídia que está tocando: janela desanexada (o vídeo vem da extensão do navegador, clipe.js) ----------
 const janelasClipe = new Set();
+// Onde nasce a próxima janela solta (a página manda logo antes de abrir, ao soltar o vídeo fora do Red Code)
+let posicaoClipe = null;
+ipcMain.handle('painel:clipe-solta-em', (ev, b) => {
+    if (!janela || ev.sender !== janela.webContents || !b) return false;
+    const n = (v) => Math.round(Number(v));
+    let lugar = { x: n(b.x), y: n(b.y), width: Math.max(192, Math.min(1600, n(b.width))), height: Math.max(108, Math.min(1200, n(b.height))) };
+    if (![lugar.x, lugar.y, lugar.width, lugar.height].every(Number.isFinite)) return false;
+    // Fica inteira dentro da tela onde foi solta
+    const area = screen.getDisplayNearestPoint({ x: lugar.x + lugar.width / 2, y: lugar.y + lugar.height / 2 }).workArea;
+    lugar.width = Math.min(lugar.width, area.width); lugar.height = Math.min(lugar.height, area.height);
+    lugar.x = Math.max(area.x, Math.min(lugar.x, area.x + area.width - lugar.width));
+    lugar.y = Math.max(area.y, Math.min(lugar.y, area.y + area.height - lugar.height));
+    posicaoClipe = { ...lugar, em: Date.now() };
+    return true;
+});
 // Janela desanexada: a altura acompanha a proporção do recorte (a largura fica)
 // Player do YouTube incorporado (opção A): daqui dá para entrar no quadro dele, mesmo sendo de outro site, e ler o
 // tempo exato do <video> e ajustar a velocidade em passos finos (a API do player arredonda para 1, 1,25...)

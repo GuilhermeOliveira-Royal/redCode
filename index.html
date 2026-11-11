@@ -1690,6 +1690,9 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .pip-clipe.pequeno .pet-video { transform: scale(.7); }
 .pip-clipe.pequeno .pet-video .pet-nome { display: none; }
 .pip-clipe.flutuando { position: fixed; z-index: 44; bottom: auto; max-height: none !important; margin: 0; opacity: 1; transform: none; box-shadow: 0 14px 36px rgba(0, 0, 0, .5); }
+/* Arrastando para fora do Red Code: avisa que soltar ali tira o vídeo para uma janela própria */
+.pip-clipe.vai-soltar { outline: 2px dashed var(--voce); outline-offset: 3px; }
+.pip-clipe.vai-soltar::after { content: "Solte para tirar do Red Code"; position: absolute; inset: auto 0 0 0; padding: 6px; background: #000c; color: #fff; font: 600 11px/1.2 var(--sans); text-align: center; pointer-events: none; }
 /* Soltando em cima do player: o canto acende para mostrar que volta a encaixar */
 .rodape-sessoes.vai-encaixar .player-midia { outline: 2px dashed var(--voce); outline-offset: 3px; }
 .pip-clipe .pip-barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 5px 18px 16px 5px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .18s; }
@@ -2970,6 +2973,16 @@ function atualizaPip() {
     if (clipePip && valida) clipePip.atualiza(m);
     mostraPip(!!clipePip && !playerMidia.hidden);
 }
+// Janela própria, sem moldura e sempre por cima (desktop/main.js); o canto fecha até ela pedir para voltar
+async function desanexaPip(lugar) {
+    if (lugar && window.painelDesktop && window.painelDesktop.clipe && window.painelDesktop.clipe.soltaEm) { try { await window.painelDesktop.clipe.soltaEm(lugar); } catch (e) { /* abre no canto da tela */ } }
+    window.open('/clipe.html', 'clipeRedCode', 'popup');
+    fechaPip(false);
+    gravaPref('clipe', 'solto');
+    desenhaMidia();
+}
+// Só no app dá para a janela solta nascer onde o vídeo foi solto (no navegador ela abre no canto)
+const podeSoltarFora = () => !!(window.painelDesktop && window.painelDesktop.clipe);
 function ligaPip() {
     pip.addEventListener('click', (ev) => {
         const tamanho = ev.target.closest('[data-pip-tamanho]');
@@ -2979,13 +2992,7 @@ function ligaPip() {
         if (!b || !clipePip) return;
         if (b.dataset.pip === 'fechar') { fechaPip(true); return desenhaMidia(); }
         if (b.dataset.pip === 'encaixar') return modoPip(false);
-        if (b.dataset.pip === 'soltar') {
-            // Janela própria, sem moldura e sempre por cima (desktop/main.js); o canto fecha até ela pedir para voltar
-            window.open('/clipe.html', 'clipeRedCode', 'popup');
-            fechaPip(false);
-            gravaPref('clipe', 'solto');
-            desenhaMidia();
-        }
+        if (b.dataset.pip === 'soltar') desanexaPip();
     });
     pip.addEventListener('pointerdown', (ev) => {
         if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-canto, .clipe-aviso button')) return;
@@ -2994,6 +3001,8 @@ function ligaPip() {
         let movendo = false;
         const rodape = document.getElementById('rodapeSessoes');
         const emCimaDoPlayer = (e) => { const r = playerMidia.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 20 && e.clientY <= r.bottom + 10; };
+        // Ponteiro fora da janela do Red Code: soltar ali vira janela solta (como o picture-in-picture do navegador)
+        const foraDaJanela = (e) => podeSoltarFora() && (e.clientX < 0 || e.clientY < 0 || e.clientX >= innerWidth || e.clientY >= innerHeight);
         const mexe = (e) => {
             if (!movendo) {
                 if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return;
@@ -3007,13 +3016,20 @@ function ligaPip() {
             gravaPref('clipeY', String(Math.round(e.clientY - dy)));
             posicionaPip();
             rodape.classList.toggle('vai-encaixar', emCimaDoPlayer(e));
+            pip.classList.toggle('vai-soltar', foraDaJanela(e));
         };
         const solta = (e) => {
             pip.removeEventListener('pointermove', mexe);
-            pip.classList.remove('arrastando');
+            pip.classList.remove('arrastando', 'vai-soltar');
             rodape.classList.remove('vai-encaixar');
             if (!movendo) return;
             pip.__arrastou = true;
+            if (foraDaJanela(e)) {
+                // Nasce com o mesmo tamanho, com o ponto que a pessoa segurava embaixo do ponteiro
+                const largura = pip.offsetWidth, altura = pip.offsetHeight;
+                const px = dx / r0.width * largura, py = dy / r0.height * altura;
+                return desanexaPip({ x: e.screenX - px, y: e.screenY - py, width: largura, height: altura });
+            }
             if (emCimaDoPlayer(e)) modoPip(false);
         };
         pip.addEventListener('pointermove', mexe);
