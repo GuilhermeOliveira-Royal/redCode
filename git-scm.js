@@ -41,7 +41,9 @@ function git(args, cwd, { tempo = 30000, buffer = false, entrada, literal = true
         if (entrada != null) { filho.stdin.on('error', () => {}); filho.stdin.end(entrada); }
     });
 }
-const texto = (buf) => { const u = buf.toString('utf8'); return u.includes('�') ? buf.toString('latin1') : u; };
+// UTF-8 válido fica UTF-8 (mesmo que traga o caractere de substituição escrito no código); senão é Latin-1 (arquivos do ERP)
+const UTF8_ESTRITO = new TextDecoder('utf-8', { fatal: true });
+const texto = (buf) => { try { return UTF8_ESTRITO.decode(buf); } catch (e) { return buf.toString('latin1'); } };
 
 async function raizDo(cwd) {
     try { return path.resolve((await git(['rev-parse', '--show-toplevel'], cwd)).trim()); } catch (e) { return null; }
@@ -110,11 +112,13 @@ async function estado(cwd) {
 }
 
 // ---------- Diff de um arquivo ----------
-async function diff(cwd, arquivo, staged) {
+// inteiro: contexto do tamanho do arquivo (o diff traz o arquivo todo, com as alterações marcadas)
+const CONTEXTO_INTEIRO = '-U1000000';
+async function diff(cwd, arquivo, staged, inteiro) {
     const raiz = await raizDo(cwd);
     if (!raiz) throw erro(400, 'Não é um repositório git.');
     const rel = caminhoSeguro(raiz, arquivo);
-    let saida = await git(['diff', '--no-color', ...(staged ? ['--cached'] : []), '--', rel], raiz, { buffer: true });
+    let saida = await git(['diff', '--no-color', ...(inteiro ? [CONTEXTO_INTEIRO] : []), ...(staged ? ['--cached'] : []), '--', rel], raiz, { buffer: true });
     if (!saida.length && !staged) {
         // Arquivo novo (não rastreado): mostra o conteúdo inteiro como adicionado
         const abs = path.join(raiz, rel);
@@ -192,11 +196,11 @@ async function avatar(cwd, email, hash) {
     avataresEmAndamento.set(chaveBusca, busca);
     try { return await busca; } finally { avataresEmAndamento.delete(chaveBusca); }
 }
-async function commit(cwd, hash, arquivo) {
+async function commit(cwd, hash, arquivo, inteiro) {
     const raiz = await raizDo(cwd);
     if (!raiz) throw erro(400, 'Não é um repositório git.');
     if (!/^[0-9a-f]{7,40}$/i.test(String(hash))) throw erro(400, 'Hash inválido.');
-    if (arquivo) return texto(await git(['show', '--no-color', '--format=', hash, '--', caminhoSeguro(raiz, arquivo)], raiz, { buffer: true }));
+    if (arquivo) return texto(await git(['show', '--no-color', '--format=', ...(inteiro ? [CONTEXTO_INTEIRO] : []), hash, '--', caminhoSeguro(raiz, arquivo)], raiz, { buffer: true }));
     const cab = await git(['show', '--no-color', '-s', '--format=%H%x1f%an <%ae>%x1f%ad%x1f%D%x1f%B', '--date=format:%d/%m/%Y %H:%M', hash], raiz);
     const [h, autor, data, refs, corpo] = cab.split('\x1f');
     const arquivos = (await git(['show', '--no-color', '--format=', '--name-status', hash], raiz)).split(/\r?\n/).filter(Boolean).map(l => { const p = l.split('\t'); return { letra: p[0][0], caminho: p[p.length - 1] }; });

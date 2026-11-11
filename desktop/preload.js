@@ -18,4 +18,10 @@ contextBridge.exposeInMainWorld('painelDesktop', {
         acao: (acao) => ipcRenderer.invoke('painel:atualizacao-acao', String(acao)),
         aoMudar: (fn) => ipcRenderer.on('painel:atualizacao', (ev, estado) => fn(estado)),
     },
+    // Vídeo da mídia (janela desanexada): a altura acompanha a proporção do vídeo
+    clipe: {
+        proporcao: (r) => ipcRenderer.invoke('painel:clipe-proporcao', Number(r) || 0),
+        // Player do YouTube incorporado: tempo exato e velocidade fina (só no app)
+        yt: (ritmo) => ipcRenderer.invoke('painel:clipe-yt', ritmo == null ? null : Number(ritmo)),
+    },
 });

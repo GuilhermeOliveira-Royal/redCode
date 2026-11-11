@@ -763,6 +763,10 @@ button.grafo-linha:hover { background: var(--folha); }
 .cm-barra .v { background: var(--ok); }
 .cm-barra .r { background: var(--edicao); }
 .cm-voltar { margin-bottom: 10px; }
+/* Barra da janela de diferenças: voltar ao commit + alternar entre só as alterações e o arquivo inteiro */
+.diff-barra { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.diff-barra .cm-voltar { margin-bottom: 0; }
+pre.diff-inteiro .ln { display: inline-block; width: 4.2em; margin: 0 12px 0 -4px; text-align: right; color: var(--grafite); opacity: .75; user-select: none; }
 .git-repo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .git-repo-escolhe { margin-left: auto; font: 12px var(--sans); padding: 2px 6px; border: 1px solid var(--linha); border-radius: 7px; background: var(--folha); color: var(--tinta); max-width: 60%; }
 .git-msg { white-space: pre-wrap; background: var(--codigo); padding: 8px; border-radius: 6px; font: 12px var(--mono); }
@@ -918,6 +922,9 @@ button.grafo-linha:hover { background: var(--folha); }
 .corpo > #pendentes { max-height: none; overflow: visible; margin-top: 14px; }
 .corpo > #pendentes:empty { display: none; }
 .situacao-chat.erro { color: var(--erro); }
+.situacao-chat .conserto-login { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: 8px; color: var(--tinta); }
+.situacao-chat .conserto-login button { padding: 3px 10px; border: 1px solid var(--voce); border-radius: 8px; color: var(--voce); font-size: 12.5px; }
+.situacao-chat .conserto-login button[data-entrar-claude] { background: var(--voce); color: #fff; }
 .situacao-chat.aviso { color: var(--atencao); }
 .pedido-voce { max-width: 1000px; border: 1px solid var(--voce); background: var(--voce-fundo); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--sombra); }
 .pedido-voce h3 { margin: 0 0 4px; font: 600 15px var(--estreita); color: var(--voce); }
@@ -976,8 +983,13 @@ button.grafo-linha:hover { background: var(--folha); }
 .bloco-md pre { margin: 0; padding: 12px 14px; font: 12.5px/1.5 var(--mono); white-space: pre; overflow-x: auto; }
 .bloco-md .lingua { position: absolute; top: 5px; left: 12px; font: 10.5px var(--mono); color: var(--grafite); text-transform: lowercase; }
 .bloco-md:has(.lingua) pre { padding-top: 24px; }
-.bloco-md .copiar { position: absolute; top: 5px; right: 6px; font-size: 11.5px; padding: 2px 8px; opacity: 0; transition: opacity .15s; }
-.bloco-md:hover .copiar, .bloco-md .copiar:focus-visible { opacity: 1; }
+/* Botões do bloco (▷ Rodar e Copiar): à direita, sempre à vista em tom baixo, cheios ao passar o mouse */
+.bloco-md .acoes-md { position: absolute; top: 5px; right: 6px; display: flex; gap: 4px; z-index: 1; }
+.bloco-md .acoes-md button { font-size: 11.5px; padding: 2px 8px; border-radius: 6px; color: var(--grafite); opacity: .75; transition: opacity .15s, background .15s, color .15s; }
+.bloco-md:hover .acoes-md button, .bloco-md .acoes-md button:focus-visible { opacity: 1; }
+.bloco-md .acoes-md button:hover { background: rgba(255,255,255,.08); color: var(--tinta); }
+.bloco-md .acoes-md .rodar:hover { color: var(--voce); }
+.bloco-md:has(.acoes-md) pre { padding-top: 26px; }
 .msg.modelo .texto code { font: 12.5px var(--mono); background: var(--codigo); padding: 1px 4px; border-radius: 3px; }
 .link-arquivo { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .link-arquivo:hover { color: var(--voce); }
@@ -1139,6 +1151,11 @@ html[data-movimento="reduzido"] .custo-moeda, html[data-movimento="reduzido"] .l
 .menu-modelo .esforcos button { flex: 1; text-align: center; border: 1px solid var(--linha); padding: 5px 4px; }
 .menu-modelo .esforcos button[aria-checked="true"] { border-color: var(--voce); }
 .menu-modelo .esforcos button[aria-checked="true"]::after { content: none; }
+.menu-modelo .esforcos { flex-wrap: wrap; }
+.menu-modelo .esforcos button { min-width: 0; padding: 5px 2px; font-size: 12px; white-space: nowrap; }
+.menu-modelo .mais-modelos { color: var(--grafite); font-size: 12px; }
+.menu-modelo .mais-modelos::after { content: none !important; }
+.menu-modelo .selo-novo { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: var(--voce); color: #fff; font-size: 10.5px; font-weight: 600; vertical-align: 1px; }
 .menu-modelo .nota-menu { padding: 4px 10px 6px; font-size: 11.5px; color: var(--grafite); border-top: 1px solid var(--linha); margin-top: 4px; }
 /* Sugestões do "/" e do "@" na caixa de mensagem */
 .sugestoes-caixa { position: fixed; z-index: 35; width: min(520px, 90vw); max-height: 300px; overflow: auto; background: var(--realce); border: 1px solid var(--linha); border-radius: 10px; box-shadow: 0 12px 32px rgba(0, 0, 0, .35); padding: 5px; }
@@ -1631,8 +1648,63 @@ body.lista-escondida .rodape-sessoes { display: none; }
 .player-midia.aviso-midia .pm-titulo { font-size: 12px; }
 .player-midia .pm-prog { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--voce); transition: width 1s linear; }
 .player-midia.pausado .pm-prog { opacity: .45; }
+.player-midia .pm-btn.ligado { color: var(--voce); }
+/* Vídeo da mídia no canto (como o picture-in-picture do navegador): em cima do player, tamanho P/M/G ou pela alça */
+.pip-clipe { position: fixed; left: 10px; bottom: 150px; z-index: 44; width: 300px; aspect-ratio: var(--pip-prop, 1.7778); overflow: hidden; border-radius: 12px; background: #000; border: 1px solid var(--linha); box-shadow: 0 14px 36px rgba(0, 0, 0, .5); animation: playerEntra .3s cubic-bezier(.2, .8, .2, 1); }
+.pip-clipe .clipe-tela { position: absolute; inset: 0; overflow: hidden; }
+.pip-clipe .clipe-tela iframe, .pip-clipe .clipe-tela video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; object-fit: contain; background: #000; pointer-events: none; }
+.pip-clipe .clipe-aviso .instalar-extensao { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
+.pip-clipe .clipe-aviso .mini { margin-left: 6px; padding: 2px 8px; border: 1px solid #fff6; border-radius: 6px; color: #fff; }
+.pip-clipe .clipe-aviso { position: absolute; inset: 0; display: grid; place-items: center; padding: 32px 14px 10px; text-align: center; font-size: 12px; line-height: 1.35; color: #d8cfc7; background: #000c; overflow-wrap: anywhere; }
+/* Carregando: o pet no meio, sobre o preto */
+.pip-clipe.clipe-carregando .clipe-aviso { padding: 10px; background: #000; }
+.pip-clipe .pet-video .pet-nome { color: #d8cfc7; max-width: none; }
+/* Pet de carregando comendo pipoca: mastiga, balde listrado do lado e grãos voando do balde até a boca */
+.pet-video .pet-corpo { animation: petMastiga .6s ease-in-out infinite; }
+.pet-video .pet-boca { position: absolute; left: 50%; bottom: 6px; width: 8px; height: 4px; margin-left: -4px; border-radius: 0 0 5px 5px; background: #1b1b1b; animation: petBoca .6s ease-in-out infinite; }
+.pet-video .pet-balde { position: absolute; right: -17px; bottom: -3px; animation: petBalde 1.8s ease-in-out infinite; }
+.pet-video .pet-grao { position: absolute; right: -11px; top: 2px; width: 5px; height: 5px; border-radius: 50%; background: #fff8e2; box-shadow: 1px 1px 0 #f0c96a inset; opacity: 0; animation: petGrao 1.8s ease-in infinite; }
+.pet-video .pet-grao.g2 { animation-delay: .6s; }
+.pet-video .pet-grao.g3 { animation-delay: 1.2s; }
+@keyframes petMastiga { 0%, 100% { transform: scale(1.05, .95); } 50% { transform: scale(.97, 1.04) translateY(-2px); } }
+@keyframes petBoca { 0%, 100% { height: 4px; } 50% { height: 1.5px; } }
+@keyframes petBalde { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-8deg); } }
+@keyframes petGrao { 0% { opacity: 0; transform: translate(0, 0) scale(.7); } 15% { opacity: 1; transform: translate(-4px, -12px) scale(1); } 60% { opacity: 1; transform: translate(-17px, -6px); } 75%, 100% { opacity: 0; transform: translate(-21px, 8px) scale(.6); } }
+/* Encaixado na lateral, logo acima do player: entra crescendo e empurra a lista de conversas para cima */
+.pip-clipe.no-canto { position: relative; left: auto; bottom: auto; z-index: auto; width: 100%; box-sizing: border-box; max-height: 0; margin: 0 0 0; box-shadow: none; animation: none; opacity: 0; transform: translateY(10px); transition: max-height .45s cubic-bezier(.2, .8, .2, 1), margin .45s cubic-bezier(.2, .8, .2, 1), opacity .3s ease, transform .45s cubic-bezier(.2, .8, .2, 1); }
+.pip-clipe.no-canto.aberto { margin-bottom: 8px; opacity: 1; transform: none; }
+.pip-clipe.no-canto [data-pip-tamanho], .pip-clipe.no-canto .pip-alca, .pip-clipe.no-canto [data-pip="encaixar"] { display: none; }
+/* Encaixado: alça no canto de baixo à direita para diminuir/aumentar ali mesmo (o canto de cima à esquerda fica parado) */
+.pip-clipe .pip-alca-canto { display: none; position: absolute; right: 0; bottom: 0; z-index: 1; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; }
+.pip-clipe.no-canto .pip-alca-canto { display: block; }
+.pip-clipe .pip-alca-canto::after { content: ""; position: absolute; right: 4px; bottom: 4px; width: 7px; height: 7px; border-bottom: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 0 3px 0; opacity: 0; transition: opacity .18s; }
+.pip-clipe:hover .pip-alca-canto::after { opacity: 1; }
+.pip-clipe.no-canto.redimensionando { transition: none; }
+/* Arrastado para fora do canto: flutua onde a pessoa soltar, com tamanho P/M/G ou pela alça */
+.pip-clipe { cursor: grab; touch-action: none; }
+.pip-clipe.arrastando { cursor: grabbing; user-select: none; transition: none !important; box-shadow: 0 18px 44px rgba(0, 0, 0, .6); }
+.pip-clipe.pequeno [data-pip-tamanho], .pip-clipe.pequeno .pip-vao { display: none; }
+.pip-clipe.pequeno .pip-barra { justify-content: flex-end; padding: 3px 14px 10px 3px; }
+.pip-clipe.pequeno .pip-barra button { min-width: 20px; height: 20px; padding: 0 3px; }
+.pip-clipe.pequeno .clipe-aviso { padding: 4px; font-size: 10px; line-height: 1.25; }
+.pip-clipe.pequeno .pet-video { transform: scale(.7); }
+.pip-clipe.pequeno .pet-video .pet-nome { display: none; }
+.pip-clipe.flutuando { position: fixed; z-index: 44; bottom: auto; max-height: none !important; margin: 0; opacity: 1; transform: none; box-shadow: 0 14px 36px rgba(0, 0, 0, .5); }
+/* Soltando em cima do player: o canto acende para mostrar que volta a encaixar */
+.rodape-sessoes.vai-encaixar .player-midia { outline: 2px dashed var(--voce); outline-offset: 3px; }
+.pip-clipe .pip-barra { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 2px; padding: 5px 18px 16px 5px; background: linear-gradient(#000d, #0000); opacity: 0; transition: opacity .18s; }
+.pip-clipe:hover .pip-barra, .pip-clipe.clipe-com-aviso .pip-barra { opacity: 1; }
+.pip-clipe .pip-barra button { display: grid; place-items: center; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 7px; color: #fff; font: 600 11px/1 var(--sans); }
+.pip-clipe .pip-barra button:hover { background: #ffffff2b; }
+.pip-clipe .pip-barra button.ligado { background: #ffffff38; }
+.pip-clipe .pip-vao { flex: 1; }
+.pip-clipe .pip-alca { position: absolute; right: 0; top: 0; z-index: 1; width: 16px; height: 16px; cursor: nesw-resize; touch-action: none; }
+.pip-clipe .pip-alca::after { content: ""; position: absolute; right: 4px; top: 4px; width: 7px; height: 7px; border-top: 2px solid #fff9; border-right: 2px solid #fff9; border-radius: 0 3px 0 0; opacity: 0; transition: opacity .18s; }
+.pip-clipe:hover .pip-alca::after { opacity: 1; }
+.pip-clipe.redimensionando { user-select: none; }
 /* Limites de uso abertos: sobem para acima do player (senão cobrem os botões) */
-body.com-player .uso-plano:not(.minimizado) { bottom: 116px; }
+/* Com o vídeo encaixado acima do player, o cartão de uso sobe junto */
+body.com-player .uso-plano:not(.minimizado) { bottom: calc(116px + var(--altura-video, 0px)); transition: bottom .45s cubic-bezier(.2, .8, .2, 1); }
 .chip-perfil .perfil-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-perfil .perfil-seta { color: var(--atencao); white-space: nowrap; }
 .chip-perfil.pendente { border-color: var(--atencao); animation: perfilPisca 1.6s ease-in-out infinite; }
@@ -2007,6 +2079,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 </script>
 <script src="/vendor/popper.js"></script>
 <script src="/vendor/tippy.js"></script>
+<script src="/clipe.js"></script>
 </head>
 <body>
 <div class="layout">
@@ -2302,6 +2375,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <label>Modelo
                 <select id="novaModelo">
                     <option value="claude-opus-5-5">Opus 5.5, para codar e investigar</option>
+                    <option value="claude-fable-5-1">Fable 5.1, o mais capaz</option>
                     <option value="claude-sonnet-5-5">Sonnet 5.5, para ajuste pequeno</option>
                     <option value="claude-haiku-5-5">Haiku 5.5, para dúvida rápida</option>
                 </select>
@@ -2311,6 +2385,8 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                     <option value="low">Baixo</option>
                     <option value="medium" selected>Médio</option>
                     <option value="high">Alto</option>
+                    <option value="xhigh">Muito alto</option>
+                    <option value="max">Máximo</option>
                 </select>
             </label>
         </div>
@@ -2640,6 +2716,10 @@ const ICONE_MIDIA = {
     pausa: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>',
     proxima: '<svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M2.5 3.2v9.6c0 .5.5.8.9.5L10 8.5a.6.6 0 0 0 0-1L3.4 2.7c-.4-.3-.9 0-.9.5z"/><rect x="11.2" y="2.6" width="2.3" height="10.8" rx=".9"/></svg>',
     nota: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M6 12.2a2 2 0 1 1-1.2-1.8V3.6l7.5-1.5v8.1a2 2 0 1 1-1.2-1.8V4.1L6 5.1z"/></svg>',
+    video: '<svg viewBox="0 0 16 16" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="3" width="13" height="10" rx="2"/><path d="M6.6 6v4l3.6-2z" fill="currentColor"/></svg>',
+    soltar: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 2.5h4.5V7M13.5 2.5 8 8"/><path d="M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3"/></svg>',
+    encaixar: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.8" y="2.8" width="12.4" height="10.4" rx="1.6"/><rect x="2.8" y="8.6" width="5.6" height="3.6" rx=".8" fill="currentColor" stroke="none"/></svg>',
+    fechar: '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>',
 };
 let midiaAtual = null, capaMostrada = -1, semMidiaDesde = 0;
 // "Brave._crx_..." / "Spotify.exe" / "Microsoft.ZuneMusic_8wekyb3d8bbwe!Microsoft.ZuneMusic" -> nome curto do app
@@ -2647,6 +2727,7 @@ const nomeAppMidia = (id) => { const n = String(id || '').split(/[.!_]/)[0]; ret
 function montaPlayer() {
     playerMidia.innerHTML = `<span class="pm-capa sem">${ICONE_MIDIA.nota}</span>
         <div class="pm-textos"><div class="pm-titulo"><span class="pm-rola"></span></div><div class="pm-artista"><span class="pm-rola"></span></div></div>
+        <button type="button" class="pm-btn" data-midia-clipe hidden title="Ver o vídeo no canto" aria-label="Ver o vídeo no canto">${ICONE_MIDIA.video}</button>
         <button type="button" class="pm-btn" data-midia="alternar"></button>
         <button type="button" class="pm-btn" data-midia="proxima" title="Próxima música" aria-label="Próxima música">${ICONE_MIDIA.proxima}</button>
         <span class="pm-prog"></span>`;
@@ -2693,6 +2774,10 @@ function desenhaMidia() {
     alternar.setAttribute('aria-label', alternar.title);
     alternar.disabled = m.podeAlternar === false;
     playerMidia.querySelector('[data-midia="proxima"]').disabled = m.podeProxima === false;
+    // Vídeo no canto: só no app desktop e quando o som não vem de um app só de música
+    const botaoClipe = playerMidia.querySelector('[data-midia-clipe]');
+    botaoClipe.hidden = !SUPORTA_CLIPE || SO_AUDIO.test(m.app || '');
+    botaoClipe.classList.toggle('ligado', !!clipePip);
     playerMidia.classList.toggle('pausado', !tocando);
     playerMidia.hidden = false;
     document.body.classList.add('com-player');
@@ -2728,13 +2813,40 @@ async function atualizaMidia() {
     if (document.hidden || JANELA_SECUNDARIA) return;
     let m;
     try { m = await getPainel('/api/midia'); } catch (e) { return; }
+    aplicaMidia(m);
+}
+let esperaSemMidia = null;
+function aplicaMidia(m) {
+    clearTimeout(esperaSemMidia);
     if (m && (m.erro === 'servico' || (!m.nada && !m.erro && m.titulo))) midiaAtual = m;
-    else if (midiaAtual && (!semMidiaDesde || Date.now() - semMidiaDesde < 5000)) { if (!semMidiaDesde) semMidiaDesde = Date.now(); return; }
+    else if (midiaAtual && (!semMidiaDesde || Date.now() - semMidiaDesde < 5000)) {
+        // Sumiu a mídia: segura a última por 5 s (troca de música passa por "nada"); depois confere de novo
+        if (!semMidiaDesde) semMidiaDesde = Date.now();
+        esperaSemMidia = setTimeout(() => aplicaMidia(m), 5100 - (Date.now() - semMidiaDesde));
+        return;
+    }
     else midiaAtual = m;
     desenhaMidia();
+    atualizaPip();
+}
+// Fica perguntando "mudou desde a versão N?": o servidor só responde quando muda (ou em 20 s), então tocar ou
+// pausar fora do Red Code aparece na hora, sem esperar a próxima volta
+async function vigiaMidia() {
+    let versao = -1;
+    const pausa = (ms) => new Promise(r => setTimeout(r, ms));
+    while (true) {
+        if (document.hidden) { await pausa(1000); continue; }
+        try {
+            const m = await getPainel('/api/midia?versao=' + versao);
+            aplicaMidia(m);
+            // Servidor antigo (sem número de versão) responde na hora: volta a perguntar de 2 em 2 s
+            if (typeof m.versao !== 'number') { versao = -1; await pausa(2000); } else versao = m.versao;
+        } catch (e) { versao = -1; await pausa(2000); }
+    }
 }
 playerMidia.addEventListener('click', async (ev) => {
     if (ev.target.closest('[data-midia-dispensar]')) { avisoMidiaDispensado = true; return desenhaMidia(); }
+    if (ev.target.closest('[data-midia-clipe]')) { if (clipePip) fechaPip(true); else abrePip(); return desenhaMidia(); }
     const b = ev.target.closest('[data-midia]');
     if (!b) return;
     // Resposta imediata no botão; a leitura seguinte confirma o estado real
@@ -2742,10 +2854,222 @@ playerMidia.addEventListener('click', async (ev) => {
     try { await api('/api/midia', { acao: b.dataset.midia }); } catch (e) { recado(e.message); }
     setTimeout(atualizaMidia, 700);
 });
-setInterval(atualizaMidia, 2000);
+if (!JANELA_SECUNDARIA) vigiaMidia();
 setInterval(() => { if (!playerMidia.hidden && !document.hidden) andaProgresso(); }, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizaMidia(); });
 setTimeout(atualizaMidia, 0);
+
+/* ---------- Vídeo da mídia no canto (como o picture-in-picture do navegador) ---------- */
+// A extensão do navegador diz qual vídeo do YouTube toca e em que segundo; o clipe.js toca uma cópia muda dele
+const SUPORTA_CLIPE = !!window.ClipeMusica && !JANELA_SECUNDARIA;
+const SO_AUDIO = /spotify|deezer|tidal|amazonmusic|applemusic|zunemusic/i;
+let pip = null, clipePip = null;
+function abrePip() {
+    if (!SUPORTA_CLIPE) return;
+    gravaPref('clipe', 'canto');
+    if (!pip) {
+        pip = document.createElement('div');
+        pip.className = 'pip-clipe';
+        pip.hidden = true;
+        pip.innerHTML = `<div class="clipe-tela"></div>
+            <div class="clipe-aviso" hidden></div>
+            <div class="pip-barra">
+                <button type="button" data-pip-tamanho="150" title="Pequeno">P</button>
+                <button type="button" data-pip-tamanho="360" title="Médio">M</button>
+                <button type="button" data-pip-tamanho="520" title="Grande">G</button>
+                <span class="pip-vao"></span>
+                <button type="button" data-pip="encaixar" title="Encaixar de volta acima do player" aria-label="Encaixar de volta">${ICONE_MIDIA.encaixar}</button>
+                <button type="button" data-pip="soltar" title="Desanexar: janela própria, sempre por cima das outras" aria-label="Desanexar">${ICONE_MIDIA.soltar}</button>
+                <button type="button" data-pip="fechar" title="Fechar o vídeo" aria-label="Fechar o vídeo">${ICONE_MIDIA.fechar}</button>
+            </div>
+            <span class="pip-alca" title="Arraste para mudar o tamanho"></span>
+            <span class="pip-alca-canto" title="Arraste para diminuir ou aumentar"></span>`;
+        // No rodapé da lateral, logo acima do player (a lista de conversas encolhe para dar lugar)
+        pip.classList.add('no-canto');
+        document.getElementById('rodapeSessoes').insertBefore(pip, playerMidia);
+        ligaPip();
+    }
+    if (lePref('clipeFlutua', '') === '1') modoPip(true);
+    if (!clipePip) clipePip = ClipeMusica(pip, {
+        confirma: (titulo, texto) => confirmaNaPagina(titulo, `<p>${esc(texto)}</p>`, 'Instalar e reabrir'),
+        aoProporcao: (r) => { pip.style.setProperty('--pip-prop', r.toFixed(4)); if (pip.classList.contains('flutuando')) posicionaPip(); else if (pip.classList.contains('aberto')) mostraPip(true); },
+    });
+    atualizaPip();
+}
+function fechaPip(lembrar) {
+    if (clipePip) { clipePip.destroi(); clipePip = null; }
+    mostraPip(false);
+    if (lembrar) gravaPref('clipe', '');
+}
+// Abre crescendo (a altura vai de 0 até a do vídeo) e fecha encolhendo; a lista acima acompanha
+function mostraPip(mostrar) {
+    if (!pip) return;
+    const altura = () => Math.round(pip.offsetWidth / (parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9));
+    if (pip.classList.contains('flutuando')) { pip.hidden = !mostrar; if (mostrar) { pip.classList.add('aberto'); posicionaPip(); } return; }
+    if (mostrar) {
+        aplicaLarguraCanto();
+        if (pip.hidden) { pip.hidden = false; pip.style.maxHeight = '0px'; void pip.offsetHeight; }
+        pip.classList.add('aberto');
+        pip.style.maxHeight = altura() + 'px';
+        document.body.style.setProperty('--altura-video', (altura() + 8) + 'px');
+    } else if (!pip.hidden) {
+        pip.classList.remove('aberto');
+        document.body.style.setProperty('--altura-video', '0px');
+        pip.style.maxHeight = '0px';
+        clearTimeout(pip.__fecha);
+        pip.__fecha = setTimeout(() => { if (!pip.classList.contains('aberto')) pip.hidden = true; }, 460);
+    }
+}
+// Largura de dentro da lateral (sem o espaçamento dela): o máximo do vídeo encaixado
+function larguraLivreCanto() {
+    const pai = pip && pip.parentElement;
+    if (!pai) return 0;
+    const e = getComputedStyle(pai);
+    return pai.clientWidth - parseFloat(e.paddingLeft) - parseFloat(e.paddingRight);
+}
+// Encaixado: a largura escolhida pela alça (vazio = a lateral toda); bem pequeno usa a barra enxuta
+function aplicaLarguraCanto() {
+    if (!pip || !pip.classList.contains('no-canto')) return;
+    const escolhida = Number(lePref('clipeLarguraCanto', '')) || 0;
+    const cabe = larguraLivreCanto();
+    const largura = escolhida && cabe ? Math.max(112, Math.min(escolhida, cabe)) : 0;
+    pip.style.width = largura && largura < cabe ? largura + 'px' : '';
+    pip.classList.toggle('pequeno', !!largura && largura < 220);
+}
+// Em cima do player, alinhado com ele; a largura escolhida diminui se não couber na janela
+function posicionaPip() {
+    if (!pip || pip.hidden || !pip.classList.contains('flutuando')) return;
+    // Flutuando: largura escolhida (P/M/G ou alça) e posição dentro da janela
+    const proporcao = parseFloat(pip.style.getPropertyValue('--pip-prop')) || 16 / 9;
+    const largura = Math.round(Math.max(112, Math.min(Number(lePref('clipeLargura', '360')) || 360, innerWidth - 24, (innerHeight - 24) * proporcao)));
+    pip.style.width = largura + 'px';
+    // Bem pequeno: a barra fica só com encaixar, desanexar e fechar; pet e avisos menores
+    pip.classList.toggle('pequeno', largura < 220);
+    const altura = largura / proporcao;
+    const x = Math.max(8, Math.min(Number(lePref('clipeX', '')) || (innerWidth - largura - 24), innerWidth - largura - 8));
+    const y = Math.max(8, Math.min(Number(lePref('clipeY', '')) || (innerHeight - altura - 24), innerHeight - altura - 8));
+    pip.style.left = Math.round(x) + 'px';
+    pip.style.top = Math.round(y) + 'px';
+}
+// Encaixado acima do player (a lista sobe) ou flutuando na janela; a escolha fica guardada
+function modoPip(flutuando) {
+    if (!pip) return;
+    gravaPref('clipeFlutua', flutuando ? '1' : '');
+    pip.classList.toggle('no-canto', !flutuando);
+    pip.classList.toggle('flutuando', flutuando);
+    if (flutuando) { pip.style.maxHeight = ''; document.body.style.setProperty('--altura-video', '0px'); posicionaPip(); }
+    else { pip.style.left = pip.style.top = pip.style.width = ''; pip.classList.remove('pequeno'); mostraPip(true); }
+}
+// A cada leitura do player: reabre se estava no canto, passa a música e some junto com o player
+function atualizaPip() {
+    if (!SUPORTA_CLIPE) return;
+    const m = midiaAtual, valida = m && !m.nada && !m.erro && m.titulo;
+    if (valida && !clipePip && lePref('clipe', '') === 'canto' && !SO_AUDIO.test(m.app || '')) return abrePip();
+    if (clipePip && valida) clipePip.atualiza(m);
+    mostraPip(!!clipePip && !playerMidia.hidden);
+}
+function ligaPip() {
+    pip.addEventListener('click', (ev) => {
+        const tamanho = ev.target.closest('[data-pip-tamanho]');
+        if (tamanho) { gravaPref('clipeLargura', tamanho.dataset.pipTamanho); return posicionaPip(); }
+        if (pip.__arrastou) { pip.__arrastou = false; return; }
+        const b = ev.target.closest('[data-pip]');
+        if (!b || !clipePip) return;
+        if (b.dataset.pip === 'fechar') { fechaPip(true); return desenhaMidia(); }
+        if (b.dataset.pip === 'encaixar') return modoPip(false);
+        if (b.dataset.pip === 'soltar') {
+            // Janela própria, sem moldura e sempre por cima (desktop/main.js); o canto fecha até ela pedir para voltar
+            window.open('/clipe.html', 'clipeRedCode', 'popup');
+            fechaPip(false);
+            gravaPref('clipe', 'solto');
+            desenhaMidia();
+        }
+    });
+    pip.addEventListener('pointerdown', (ev) => {
+        if (ev.button !== 0 || ev.target.closest('button, .pip-alca, .pip-alca-canto, .clipe-aviso button')) return;
+        const r0 = pip.getBoundingClientRect();
+        const dx = ev.clientX - r0.left, dy = ev.clientY - r0.top, x0 = ev.clientX, y0 = ev.clientY;
+        let movendo = false;
+        const rodape = document.getElementById('rodapeSessoes');
+        const emCimaDoPlayer = (e) => { const r = playerMidia.getBoundingClientRect(); return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 20 && e.clientY <= r.bottom + 10; };
+        const mexe = (e) => {
+            if (!movendo) {
+                if (Math.hypot(e.clientX - x0, e.clientY - y0) < 6) return;
+                movendo = true;
+                pip.setPointerCapture(ev.pointerId);
+                pip.classList.add('arrastando');
+                // Saindo do canto: guarda o tamanho de agora e passa a flutuar a partir de onde estava
+                if (!pip.classList.contains('flutuando')) { gravaPref('clipeLargura', String(Math.round(Math.max(r0.width, 300)))); modoPip(true); }
+            }
+            gravaPref('clipeX', String(Math.round(e.clientX - dx)));
+            gravaPref('clipeY', String(Math.round(e.clientY - dy)));
+            posicionaPip();
+            rodape.classList.toggle('vai-encaixar', emCimaDoPlayer(e));
+        };
+        const solta = (e) => {
+            pip.removeEventListener('pointermove', mexe);
+            pip.classList.remove('arrastando');
+            rodape.classList.remove('vai-encaixar');
+            if (!movendo) return;
+            pip.__arrastou = true;
+            if (emCimaDoPlayer(e)) modoPip(false);
+        };
+        pip.addEventListener('pointermove', mexe);
+        pip.addEventListener('pointerup', solta, { once: true });
+        pip.addEventListener('pointercancel', solta, { once: true });
+    });
+    // Encaixado: alça no canto de baixo à direita; para a esquerda ou para cima diminui, o vídeo continua acima do player
+    const alcaCanto = pip.querySelector('.pip-alca-canto');
+    alcaCanto.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        alcaCanto.setPointerCapture(ev.pointerId);
+        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
+        const cabe = larguraLivreCanto();
+        pip.classList.add('redimensionando');
+        const mexe = (e) => {
+            // Vale o movimento maior: o de lado ou o de cima/baixo (convertido em largura pela proporção do vídeo)
+            const dx = e.clientX - x0, dy = (e.clientY - y0) * proporcao;
+            const largura = Math.round(Math.max(112, Math.min(cabe, largura0 + (Math.abs(dx) > Math.abs(dy) ? dx : dy))));
+            gravaPref('clipeLarguraCanto', largura >= cabe ? '' : String(largura));
+            mostraPip(true);
+        };
+        const solta = () => { alcaCanto.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); pip.__arrastou = true; setTimeout(() => { pip.__arrastou = false; }, 0); };
+        alcaCanto.addEventListener('pointermove', mexe);
+        alcaCanto.addEventListener('pointerup', solta, { once: true });
+        alcaCanto.addEventListener('pointercancel', solta, { once: true });
+    });
+    // Alça no canto de cima à direita: arrastar para fora aumenta (o quadrinho cresce para cima e para a direita)
+    const alca = pip.querySelector('.pip-alca');
+    alca.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        alca.setPointerCapture(ev.pointerId);
+        const x0 = ev.clientX, y0 = ev.clientY, largura0 = pip.offsetWidth, proporcao = pip.offsetWidth / pip.offsetHeight;
+        pip.classList.add('redimensionando');
+        const baixo0 = pip.getBoundingClientRect().bottom;
+        const mexe = (e) => {
+            const largura = Math.round(Math.max(112, largura0 + Math.max(e.clientX - x0, (y0 - e.clientY) * proporcao)));
+            gravaPref('clipeLargura', String(largura));
+            gravaPref('clipeY', String(Math.round(baixo0 - largura / proporcao)));
+            posicionaPip();
+        };
+        const solta = () => { alca.removeEventListener('pointermove', mexe); pip.classList.remove('redimensionando'); };
+        alca.addEventListener('pointermove', mexe);
+        alca.addEventListener('pointerup', solta, { once: true });
+        alca.addEventListener('pointercancel', solta, { once: true });
+    });
+}
+if (SUPORTA_CLIPE && 'BroadcastChannel' in window) {
+    // Conversa com a janela desanexada (clipe.html): voltar para o canto, fechar
+    new BroadcastChannel('redcode-clipe').addEventListener('message', (ev) => {
+        const d = ev.data || {};
+        if (d.tipo === 'desanexou') { if (clipePip) fechaPip(false); gravaPref('clipe', 'solto'); }
+        if (d.tipo === 'anexar') abrePip();
+        if (d.tipo === 'fechar') gravaPref('clipe', '');
+        desenhaMidia();
+    });
+    addEventListener('resize', posicionaPip);
+}
 
 /* ---------- Limites de uso do plano (rodapé da lista) ---------- */
 function quandoReinicia(iso) {
@@ -3228,8 +3552,7 @@ document.getElementById('painelGit').addEventListener('click', async (ev) => {
     if (det) return mostraCommitGit(det.dataset.gitCommitDetalhes);
     const arqGrafo = ev.target.closest('.grafo-arq[data-git-arq-commit]');
     if (arqGrafo) {
-        const r = await getPainel(`/api/git/commit?cwd=${encodeURIComponent(pastaDoGit())}&hash=${arqGrafo.dataset.hash}&arquivo=${encodeURIComponent(arqGrafo.dataset.gitArqCommit)}`).catch(e => ({ diff: e.message }));
-        return abreJanelaGit(arqGrafo.dataset.gitArqCommit, `<button type="button" class="mini cm-voltar" data-voltar-commit="${esc(arqGrafo.dataset.hash)}">‹ Voltar ao commit</button>` + diffUnificado(r.diff || '(sem diferenças)'));
+        return abreDiffArquivo(arqGrafo.dataset.gitArqCommit, `/api/git/commit?cwd=${encodeURIComponent(pastaDoGit())}&hash=${arqGrafo.dataset.hash}&arquivo=${encodeURIComponent(arqGrafo.dataset.gitArqCommit)}`, arqGrafo.dataset.hash);
     }
     const cm = ev.target.closest('[data-git-commit]');
     if (cm) return alternaCommitGrafo(cm.dataset.gitCommit, cm);
@@ -3265,6 +3588,10 @@ function abreJanelaGit(titulo, html, modo) {
 }
 janelaGit.addEventListener('click', async (ev) => {
     if (ev.target === janelaGit || ev.target.closest('[data-fechar-git]')) { janelaGit.hidden = true; return; }
+    if (ev.target.closest('[data-diff-inteiro]') && diffAberto) {
+        gravaPref('diffInteiro', diffAberto.inteiro ? '' : '1');
+        return abreDiffArquivo(diffAberto.titulo, diffAberto.url, diffAberto.voltarHash);
+    }
     const acaoDados = ev.target.closest('.dados-conversa [data-acao]');
     if (acaoDados) {
         janelaGit.hidden = true;
@@ -3279,7 +3606,7 @@ janelaGit.addEventListener('click', async (ev) => {
     const voltar = ev.target.closest('[data-voltar-commit]');
     if (voltar) return mostraCommitGit(voltar.dataset.voltarCommit);
     const arqCommit = ev.target.closest('[data-git-arq-commit]');
-    if (arqCommit) { const r = await getPainel(`/api/git/commit?cwd=${encodeURIComponent(pastaDoGit())}&hash=${arqCommit.dataset.hash}&arquivo=${encodeURIComponent(arqCommit.dataset.gitArqCommit)}`).catch(e => ({ diff: e.message })); return abreJanelaGit(arqCommit.dataset.gitArqCommit, `<button type="button" class="mini cm-voltar" data-voltar-commit="${esc(arqCommit.dataset.hash)}">‹ Voltar ao commit</button>` + diffUnificado(r.diff || '(sem diferenças)')); }
+    if (arqCommit) return abreDiffArquivo(arqCommit.dataset.gitArqCommit, `/api/git/commit?cwd=${encodeURIComponent(pastaDoGit())}&hash=${arqCommit.dataset.hash}&arquivo=${encodeURIComponent(arqCommit.dataset.gitArqCommit)}`, arqCommit.dataset.hash);
     const br = ev.target.closest('[data-git-trocar]');
     if (br) {
         const cwd = pastaDoGit();
@@ -3297,8 +3624,34 @@ janelaGit.addEventListener('click', async (ev) => {
     }
 });
 async function mostraDiffGit(arquivo, staged) {
-    try { const r = await getPainel(`/api/git/diff?cwd=${encodeURIComponent(pastaDoGit())}&arquivo=${encodeURIComponent(arquivo)}&staged=${staged ? 1 : 0}`); abreJanelaGit(`${arquivo}${staged ? ' (preparado)' : ''}`, diffUnificado(r.diff || '(sem diferenças)')); }
-    catch (e) { recado(e.message); }
+    return abreDiffArquivo(`${arquivo}${staged ? ' (preparado)' : ''}`, `/api/git/diff?cwd=${encodeURIComponent(pastaDoGit())}&arquivo=${encodeURIComponent(arquivo)}&staged=${staged ? 1 : 0}`);
+}
+// Diferenças de um arquivo: só os trechos alterados ou o arquivo inteiro com as alterações marcadas
+// (a escolha fica guardada para os próximos arquivos)
+let diffAberto = null;
+async function abreDiffArquivo(titulo, url, voltarHash) {
+    const inteiro = lePref('diffInteiro', '') === '1';
+    const pedido = diffAberto = { titulo, url, voltarHash, inteiro };
+    const r = await getPainel(url + (inteiro ? '&inteiro=1' : '')).catch(e => ({ diff: e.message }));
+    if (diffAberto !== pedido) return;
+    const barra = `<div class="diff-barra">${voltarHash ? `<button type="button" class="mini cm-voltar" data-voltar-commit="${esc(voltarHash)}">‹ Voltar ao commit</button>` : ''}
+        <button type="button" class="mini" data-diff-inteiro>${inteiro ? 'Só as alterações' : 'Ver arquivo inteiro'}</button></div>`;
+    abreJanelaGit(titulo, barra + (inteiro ? diffInteiro(r.diff || '') : diffUnificado(r.diff || '(sem diferenças)')));
+}
+// Arquivo inteiro: sem o cabeçalho do git e com o número da linha (a linha removida não tem número)
+function diffInteiro(texto) {
+    const linhas = [];
+    let n = 0;
+    for (const t of texto.split('\n')) {
+        if (/^(diff --git|index |--- |\+\+\+ |new file|deleted file|similarity|rename |old mode|new mode|\\ No newline)/.test(t)) continue;
+        const cab = t.match(/^@@ -\d+(?:,\d+)? \+(\d+)/);
+        if (cab) { n = Math.max(0, Number(cab[1]) - 1); continue; }
+        if (/^Binary files/.test(t)) { linhas.push(`<span class="l">${esc(t)}</span>`); continue; }
+        const c = t[0] === '+' ? ' mais' : t[0] === '-' ? ' menos' : '';
+        linhas.push(`<span class="l${c}"><span class="ln">${t[0] === '-' ? '' : ++n}</span>${esc(t.slice(1))}</span>`);
+        if (linhas.length >= 20000) { linhas.push('<span class="l cab">(arquivo cortado em 20.000 linhas)</span>'); break; }
+    }
+    return linhas.length ? '<pre class="diff diff-inteiro">' + linhas.join('') + '</pre>' : diffUnificado('(sem diferenças)');
 }
 // Mensagem do commit em parágrafos (linhas quebradas a 72 colunas viram uma só; "- item" vira lista)
 function paragrafosCommit(texto) {
@@ -3624,9 +3977,9 @@ function verificaAcompanhar(d) {
 // Shell do terminal (Configuração deste navegador): PowerShell, Git Bash ou CMD
 const NOMES_SHELL = { powershell: 'PowerShell', gitbash: 'Git Bash', cmd: 'CMD' };
 const shellPreferido = () => { try { const v = localStorage.getItem('painelShellTerminal'); return NOMES_SHELL[v] ? v : 'powershell'; } catch (e) { return 'powershell'; } };
-function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo = '', login = '', claude = '' } = {}) {
-    // Comando do próprio Red Code (acompanhar arquivo), login e /mcp do Claude: sempre PowerShell
-    const shell = comando || login || claude ? 'powershell' : shellPreferido();
+function criaTerminal(pasta, { chave = pasta, comando = '', rotulo = '', titulo = '', login = '', claude = '', shell: shellPedido = '' } = {}) {
+    // Comando do próprio Red Code (acompanhar arquivo), login e /mcp do Claude: PowerShell (ou o shell do bloco que mandou rodar)
+    const shell = shellPedido || (comando || login || claude ? 'powershell' : shellPreferido());
     rotulo = rotulo || NOMES_SHELL[shell];
     const el = document.createElement('div');
     document.getElementById('corpoTerminal').appendChild(el);
@@ -3867,6 +4220,15 @@ function celulasTabela(linha) {
     return linha.trim().replace(/^\|/, '').replace(/\|$/, '').split(/(?<!\\)\|/).map(c => c.replace(/\\\|/g, '|').trim());
 }
 // Markdown das respostas: tabelas viram <table>; o resto, linha a linha
+// Linguagem do bloco -> shell do terminal que roda ele ('' = não é comando)
+const SHELL_DO_BLOCO = (lingua) => {
+    const l = String(lingua || '').toLowerCase();
+    if (!l) return 'powershell';
+    if (['bash', 'sh', 'zsh', 'shell', 'console'].includes(l)) return 'gitbash';
+    if (['cmd', 'bat', 'batch'].includes(l)) return 'cmd';
+    if (['powershell', 'ps', 'ps1', 'pwsh'].includes(l)) return 'powershell';
+    return '';
+};
 function markdown(texto) {
     const linhas = String(texto).split('\n');
     const saida = [];
@@ -3877,7 +4239,10 @@ function markdown(texto) {
             i++;
             while (i < linhas.length && !linhas[i].trim().startsWith(cerca[1])) codigo.push(linhas[i++]);
             const lingua = cerca[2] ? `<span class="lingua">${esc(cerca[2])}</span>` : '';
-            saida.push(`<div class="bloco-md">${lingua}<button class="copiar" data-acao="copiar-md" title="Copiar o código">Copiar</button><pre>${esc(codigo.join('\n'))}</pre></div>`);
+            // Bloco de comando (PowerShell, bash, cmd, ou curto e sem linguagem): dá para rodar no terminal da conversa
+            const rodavel = SHELL_DO_BLOCO(cerca[2]) && codigo.some(l => l.trim()) && (cerca[2] || codigo.length <= 3);
+            const rodar = rodavel ? `<button class="rodar" data-acao="rodar-md" data-lingua="${esc(cerca[2] || '')}" title="Rodar no terminal, na pasta desta conversa">▷ Rodar</button>` : '';
+            saida.push(`<div class="bloco-md"><span class="acoes-md">${rodar}<button class="copiar" data-acao="copiar-md" title="Copiar o código">Copiar</button></span>${lingua}<pre>${esc(codigo.join('\n'))}</pre></div>`);
             continue;
         }
         const separador = linhas[i + 1] && /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(linhas[i + 1]);
@@ -5768,7 +6133,10 @@ const SECOES_CONFIG = {
         const temInicio = !!(window.painelDesktop && window.painelDesktop.inicioWindows);
         let inicio = false;
         if (temInicio) { try { inicio = await window.painelDesktop.inicioWindows(); } catch (e) { /* sem resposta do app */ } }
+        const temAtualizacao = !!(window.painelDesktop && window.painelDesktop.atualizacao);
         return '<h3 class="config-titulo">Sistema</h3>'
+            + linhaConfig('Atualizações', temAtualizacao ? 'O Red Code já confere sozinho ao abrir e de tempos em tempos. Aqui confere agora; se tiver versão nova, aparece o cartão para atualizar acima do player.' : 'Só no app do Red Code.',
+                `<button class="mini" data-config-acao="atualizacoes" ${temAtualizacao ? '' : 'disabled'}>Buscar atualizações</button>`, 'atualizar versao nova release')
             + linhaConfig('Avisos no Windows', 'Avisa quando uma conversa termina ou faz uma pergunta. É o mesmo sino do topo da lista.', chaveConfig('avisos', notificar), 'notificacoes sino')
             + linhaConfig('Iniciar com o Windows', temInicio ? 'Abre o Red Code escondido na bandeja ao entrar no Windows.' : 'Só no app do Red Code (depois de fechar e abrir o app com esta versão).', chaveConfig('inicio', inicio, !temInicio), 'bandeja');
     },
@@ -5877,6 +6245,20 @@ janelaConfig.addEventListener('click', async (evt) => {
     const abrirRegra = evt.target.closest('[data-abrir-regra]');
     if (abrirRegra) { evt.preventDefault(); return abreArquivoCitado(abrirRegra.dataset.abrirRegra, evt.ctrlKey); }
     const acao = evt.target.closest('[data-config-acao]');
+    if (acao && acao.dataset.configAcao === 'atualizacoes') {
+        const texto = acao.textContent;
+        acao.disabled = true; acao.textContent = 'Procurando…';
+        try {
+            const r = await window.painelDesktop.atualizacao.acao('verificar');
+            desenhaAtualizacao(r);
+            if (r.resultado === 'ultima') recado(`Já está na última versão${r.versaoApp ? ' (' + r.versaoApp + ')' : ''}`);
+            else if (r.resultado === 'erro') recado('Não deu para procurar: ' + (r.erro || 'sem resposta do GitHub'));
+            else if (r.resultado === 'ocupado') recado(r.fase === 'pronta' ? 'A versão nova já está baixada: reinicie para usar' : 'A versão nova já está baixando');
+            else recado(r.modo === 'git' ? plural(r.commits, 'novidade no GitHub', 'novidades no GitHub') + ': reinicie para puxar' : `Versão ${r.versao} disponível: use o cartão acima do player`);
+        } catch (e) { recado('Não deu para procurar: ' + e.message); }
+        finally { acao.disabled = false; acao.textContent = texto; }
+        return;
+    }
     if (acao && acao.dataset.configAcao === 'logs') { const ok = await window.painelDesktop.abrirLogs(); if (!ok) recado('Não deu para abrir a pasta dos logs.'); return; }
     if (acao && acao.dataset.configAcao === 'reiniciar') {
         try { await api('/api/reiniciar', {}); recado('Reinício agendado: acontece quando nada estiver trabalhando'); } catch (e) { recado('Não consegui agendar: ' + e.message); }
@@ -6982,6 +7364,16 @@ principal.addEventListener('click', (ev) => {
         if (tipo === 'editor') return abreEditor();
         if (tipo === 'trello') return ligaTrello();
         if (tipo === 'nova-janela') return window.open('/?sessao=' + encodeURIComponent(sessaoAtual), 'conversa-' + sessaoAtual.split('/')[1]);
+        if (tipo === 'rodar-md') {
+            ev.stopPropagation();
+            const pasta = pastaDaConversa();
+            if (!pasta) return recado('Abra a conversa de código para rodar na pasta dela.');
+            // Tira o "$ " ou "> " de prompt que às vezes vem na frente de cada linha; cada linha vira um Enter
+            const linhas = acao.closest('.bloco-md').querySelector('pre').textContent.split('\n').map(l => l.replace(/^\s*(\$|PS [^>]*>|>)\s+/, '')).filter(l => l.trim());
+            const shell = SHELL_DO_BLOCO(acao.dataset.lingua) || 'powershell';
+            const primeiro = linhas[0].trim();
+            return mostraTerminal(pasta, pasta + '|rodar|' + Date.now(), { rotulo: '▷ ' + (primeiro.length > 22 ? primeiro.slice(0, 21) + '…' : primeiro), titulo: 'Rodando: ' + linhas.join(' ; '), comando: linhas.join('\r') + '\r', shell });
+        }
         if (tipo === 'copiar-md') {
             ev.stopPropagation();
             return copiar(acao.closest('.bloco-md').querySelector('pre').textContent, 'Código copiado');
@@ -7285,6 +7677,12 @@ function desenhaCompositor() {
     situacao.hidden = !texto;
     situacao.textContent = texto;
     situacao.className = 'situacao-chat ' + classe;
+    // Login do Claude Code vencido (o token não renovou): entra de novo ali mesmo, com a conta desta conversa
+    if (conversa && conversa.status === 'erro' && LOGIN_VENCIDO.test(conversa.erro || '')) {
+        situacao.insertAdjacentHTML('beforeend', `<span class="conserto-login">O login do Claude Code venceu.
+            <button type="button" class="mini" data-entrar-claude>Entrar de novo</button>
+            <button type="button" class="mini" data-tentar-de-novo>Tentar de novo</button></span>`);
+    }
 
     // Com a resposta em andamento pelo painel, dá para comentar: a mensagem entra no próximo passo
     const bloqueada = !sessaoAtual || ocupadaFora || (d && !d.cwd);
@@ -7337,6 +7735,22 @@ async function atualizaChat() {
     desenhaCompositor();
 }
 
+// Erros de login do Claude Code: token vencido que não renovou, sessão sem login, chave recusada
+const LOGIN_VENCIDO = /OAuth|authenticat|401|not logged in|log ?in again|\/login|invalid.*(api key|token)/i;
+document.getElementById('situacaoChat').addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-entrar-claude]')) {
+        // Terminal com o Claude da conta desta conversa rodando /login (abre o navegador para entrar)
+        const pasta = pastaDaConversa() || (ultimosDados && ultimosDados.cwd);
+        if (!pasta) return recado('Abra a conversa para entrar de novo.');
+        return mostraTerminal(pasta, pasta + '|login', { rotulo: 'Claude /login', titulo: 'Entrar de novo no Claude Code', claude: 'login' });
+    }
+    if (ev.target.closest('[data-tentar-de-novo]')) {
+        // Depois de entrar: manda "continue" e a conversa segue de onde parou
+        const caixa = document.getElementById('mensagem');
+        if (!caixa.value.trim()) caixa.value = 'continue';
+        enviaMensagem();
+    }
+});
 async function enviaMensagem() {
     const campo = document.getElementById('mensagem');
     const texto = campo.value.trim() || (anexosPendentes.length ? 'Veja o que anexei.' : '');
@@ -7621,12 +8035,61 @@ formCaixa.addEventListener('drop', (ev) => {
 
 /* ---------- Troca de modelo e esforço na conversa aberta ---------- */
 // Escolha por conversa; vale a partir da próxima mensagem. Sem escolha, segue o da conversa.
+// Lista inicial (sem rede); a de verdade vem do Claude Code (carregaModelosClaude) e traz os lançamentos novos
+const USO_FAMILIA = { opus: 'Codar e investigar', fable: 'O mais capaz: tarefas difíceis e longas', sonnet: 'Ajuste pequeno e localizado', haiku: 'Dúvida rápida, comando, texto curto' };
 const OPCOES_MODELO = [
-    { id: 'claude-opus-5-5', nome: 'Opus 5.5', uso: 'Codar e investigar' },
-    { id: 'claude-sonnet-5-5', nome: 'Sonnet 5.5', uso: 'Ajuste pequeno e localizado' },
-    { id: 'claude-haiku-5-5', nome: 'Haiku 5.5', uso: 'Dúvida rápida, comando, texto curto' },
+    { id: 'claude-opus-5-5', nome: 'Opus 5.5', uso: USO_FAMILIA.opus, principal: true },
+    { id: 'claude-fable-5-1', nome: 'Fable 5.1', uso: USO_FAMILIA.fable, principal: true },
+    { id: 'claude-sonnet-5-5', nome: 'Sonnet 5.5', uso: USO_FAMILIA.sonnet, principal: true },
+    { id: 'claude-haiku-5-5', nome: 'Haiku 5.5', uso: USO_FAMILIA.haiku, principal: true },
 ];
-const OPCOES_ESFORCO = [['low', 'Baixo'], ['medium', 'Médio'], ['high', 'Alto']];
+const OPCOES_ESFORCO = [['low', 'Baixo'], ['medium', 'Médio'], ['high', 'Alto'], ['xhigh', 'Muito alto'], ['max', 'Máximo']];
+// Esforços que o modelo aceita (a lista do Claude Code diz; sem ela, os três de sempre)
+const esforcosDo = (id) => { const m = OPCOES_MODELO.find(o => o.id === id); return m && m.esforcos && m.esforcos.length ? m.esforcos : ['low', 'medium', 'high']; };
+let modelosNovos = new Set();
+async function carregaModelosClaude(atualizar) {
+    let r;
+    try { r = await getPainel('/api/modelos-claude' + (atualizar ? '?atualizar=1' : '')); } catch (e) { return; }
+    if (!r || !Array.isArray(r.modelos) || !r.modelos.length) return;
+    const lista = r.modelos.map(m => ({ id: m.id, nome: m.nome, uso: USO_FAMILIA[m.familia] || m.descricao, esforcos: m.esforcos, principal: m.principal }));
+    OPCOES_MODELO.splice(0, OPCOES_MODELO.length, ...lista);
+    for (const m of lista) NOMES_MODELO[m.id] = m.nome;
+    // Modelo que nunca apareceu antes (lançamento da Anthropic): marca "novo" no menu e avisa uma vez
+    let vistos = null;
+    try { vistos = JSON.parse(localStorage.getItem('painelPref_modelosVistos') || 'null'); } catch (e) { vistos = null; }
+    const ids = lista.map(m => m.id);
+    if (Array.isArray(vistos)) {
+        // Só a versão mais nova de cada família é lançamento (a lista também traz as anteriores)
+        const novos = lista.filter(m => m.principal && !vistos.includes(m.id));
+        novos.forEach(m => modelosNovos.add(m.id));
+        if (novos.length) recado(`Modelo novo disponível: ${novos.map(m => m.nome).join(', ')}`);
+    }
+    gravaPref('modelosVistos', JSON.stringify([...new Set([...(vistos || []), ...ids])]));
+    desenhaOpcoesNova();
+}
+// Selects da Nova conversa: os principais primeiro, as versões anteriores num grupo
+function desenhaOpcoesNova() {
+    const sel = document.getElementById('novaModelo');
+    if (!sel) return;
+    const atual = sel.value;
+    const opcao = (m) => `<option value="${esc(m.id)}">${esc(m.nome)}, ${esc((m.uso || '').toLowerCase())}</option>`;
+    const antigos = OPCOES_MODELO.filter(m => !m.principal);
+    sel.innerHTML = OPCOES_MODELO.filter(m => m.principal).map(opcao).join('') + (antigos.length ? `<optgroup label="Versões anteriores">${antigos.map(opcao).join('')}</optgroup>` : '');
+    if ([...sel.options].some(o => o.value === atual)) sel.value = atual;
+    desenhaEsforcoNova();
+}
+function desenhaEsforcoNova() {
+    const sel = document.getElementById('novaEsforco');
+    const modelo = document.getElementById('novaModelo');
+    if (!sel || !modelo) return;
+    const atual = sel.value || 'medium';
+    const aceitos = esforcosDo(modelo.value);
+    sel.innerHTML = OPCOES_ESFORCO.filter(([id]) => aceitos.includes(id)).map(([id, nome]) => `<option value="${id}">${nome}</option>`).join('');
+    sel.value = aceitos.includes(atual) ? atual : (aceitos.includes('medium') ? 'medium' : aceitos[0]);
+}
+document.getElementById('novaModelo').addEventListener('change', desenhaEsforcoNova);
+setTimeout(() => carregaModelosClaude(), 1500);
+setInterval(() => carregaModelosClaude(), 6 * 3600e3);
 const escolhasModelo = {};
 function modeloEscolhido() {
     const d = ultimosDados || {};
@@ -7635,10 +8098,16 @@ function modeloEscolhido() {
 function abreMenuModelo(botao) {
     const menu = document.getElementById('menuModelo');
     const atual = modeloEscolhido();
+    const item = (m) => `<button role="menuitemradio" aria-checked="${atual.modelo === m.id}" data-modelo="${esc(m.id)}">${esc(m.nome)}${modelosNovos.has(m.id) ? ' <span class="selo-novo">novo</span>' : ''}<small>${esc(m.uso)}</small></button>`;
+    const antigos = OPCOES_MODELO.filter(m => !m.principal);
+    // Versão anterior em uso nesta conversa: o grupo já abre (senão a marca ✓ some)
+    const abreAntigos = menuAntigosAberto || antigos.some(m => m.id === atual.modelo);
+    const aceitos = esforcosDo(atual.modelo);
     menu.innerHTML = '<div class="titulo-menu">Modelo</div>'
-        + OPCOES_MODELO.map(m => `<button role="menuitemradio" aria-checked="${atual.modelo === m.id}" data-modelo="${m.id}">${esc(m.nome)}<small>${esc(m.uso)}</small></button>`).join('')
+        + OPCOES_MODELO.filter(m => m.principal).map(item).join('')
+        + (antigos.length ? `<button class="mais-modelos" data-mais-modelos aria-expanded="${abreAntigos}">${abreAntigos ? '▾' : '▸'} Versões anteriores (${antigos.length})</button>` + (abreAntigos ? antigos.map(item).join('') : '') : '')
         + '<div class="titulo-menu">Esforço</div><div class="esforcos">'
-        + OPCOES_ESFORCO.map(([id, nome]) => `<button role="menuitemradio" aria-checked="${atual.esforco === id}" data-esforco="${id}">${nome}</button>`).join('')
+        + OPCOES_ESFORCO.filter(([id]) => aceitos.includes(id)).map(([id, nome]) => `<button role="menuitemradio" aria-checked="${atual.esforco === id}" data-esforco="${id}">${nome}</button>`).join('')
         + '</div><div class="nota-menu">Vale a partir da próxima mensagem desta conversa.</div>';
     const r = botao.getBoundingClientRect();
     menu.hidden = false;
@@ -7654,12 +8123,20 @@ document.getElementById('chipModelo').addEventListener('click', (ev) => {
     ev.stopPropagation();
     if (document.getElementById('menuModelo').hidden) abreMenuModelo(ev.currentTarget); else fechaMenuModelo();
 });
+let menuAntigosAberto = false;
 document.getElementById('menuModelo').addEventListener('click', (ev) => {
     ev.stopPropagation();
+    if (ev.target.closest('[data-mais-modelos]')) { menuAntigosAberto = !menuAntigosAberto; return abreMenuModelo(document.getElementById('chipModelo')); }
     const b = ev.target.closest('[data-modelo], [data-esforco]');
     if (!b) return;
     const atual = { ...modeloEscolhido() };
-    if (b.dataset.modelo) atual.modelo = b.dataset.modelo;
+    if (b.dataset.modelo) {
+        atual.modelo = b.dataset.modelo;
+        modelosNovos.delete(atual.modelo);
+        // Esforço que o modelo novo não aceita: cai para o mais alto que ele aceita
+        const aceitos = esforcosDo(atual.modelo);
+        if (atual.esforco && !aceitos.includes(atual.esforco)) atual.esforco = aceitos.includes('high') ? 'high' : aceitos[aceitos.length - 1];
+    }
     if (b.dataset.esforco) atual.esforco = b.dataset.esforco;
     const d = ultimosDados || {};
     // Voltou ao que a conversa já usa: não há troca pendente

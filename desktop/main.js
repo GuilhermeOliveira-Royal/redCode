@@ -2,7 +2,7 @@
 // O Electron é só casca + lançador: o servidor continua no Node do sistema (igual ao de hoje),
 // como processo filho. Assim o SDK e os processos do Claude não mudam, e reiniciar o servidor
 // não derruba a janela.
-const { app, BrowserWindow, Tray, Menu, nativeImage, globalShortcut, shell, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, globalShortcut, shell, dialog, ipcMain, screen } = require('electron');
 const { spawn, execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -314,10 +314,21 @@ function protegeJanela(win) {
                 width: 1300, height: 860, title: 'Editor · Red Code', icon: icone(256), backgroundColor: '#141011', autoHideMenuBar: true, webPreferences: PREFERENCIAS_WEB(),
             } };
         }
+        if (url.startsWith(ORIGEM + '/clipe.html')) {
+            // Vídeo desanexado: janela sem moldura, sempre por cima das outras (como o picture-in-picture do navegador)
+            // Nasce já no lugar (mover entre telas com zoom diferente depois de criada muda o tamanho)
+            const area = screen.getDisplayMatching(win.getBounds()).workArea;
+            return { action: 'allow', overrideBrowserWindowOptions: {
+                x: area.x + area.width - 480 - 24, y: area.y + area.height - 270 - 24, width: 480, height: 270, minWidth: 192, minHeight: 108, frame: false, alwaysOnTop: true, title: 'Vídeo · Red Code', icon: icone(256), backgroundColor: '#000000', autoHideMenuBar: true, webPreferences: PREFERENCIAS_WEB(),
+            } };
+        }
         abreFora(url);
         return { action: 'deny' };
     });
-    win.webContents.on('did-create-window', (filha) => protegeJanela(filha));
+    win.webContents.on('did-create-window', (filha, detalhes) => {
+        protegeJanela(filha);
+        if (detalhes && String(detalhes.url).startsWith(ORIGEM + '/clipe.html')) ajustaJanelaClipe(filha);
+    });
     // Página pediu para não fechar (alterações não salvas): no Electron isso cancela em silêncio, então pergunta
     win.webContents.on('will-prevent-unload', (ev) => {
         const dono = BrowserWindow.fromWebContents(win.webContents);
@@ -370,6 +381,40 @@ ipcMain.handle('painel:abrir-logs', async (ev) => {
     if (!janela || ev.sender !== janela.webContents) return false;
     return (await shell.openPath(PASTA_DADOS)) === '';
 });
+
+// ---------- Vídeo da mídia que está tocando: janela desanexada (o vídeo vem da extensão do navegador, clipe.js) ----------
+const janelasClipe = new Set();
+// Janela desanexada: a altura acompanha a proporção do recorte (a largura fica)
+// Player do YouTube incorporado (opção A): daqui dá para entrar no quadro dele, mesmo sendo de outro site, e ler o
+// tempo exato do <video> e ajustar a velocidade em passos finos (a API do player arredonda para 1, 1,25...)
+ipcMain.handle('painel:clipe-yt', async (ev, ritmo) => {
+    const u = ev.sender.getURL();
+    if (!(u === ORIGEM || u.startsWith(ORIGEM + '/'))) return null;
+    const quadro = ev.sender.mainFrame.framesInSubtree.find(f => /^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(f.url));
+    if (!quadro) return null;
+    const r = Number(ritmo);
+    const define = r >= 0.5 && r <= 2 ? `if (Math.abs(v.playbackRate - ${r}) > 0.002) v.playbackRate = ${r};` : '';
+    try {
+        return await quadro.executeJavaScript(`(() => { const v = document.querySelector('video'); if (!v) return null; ${define} return { t: v.currentTime, r: v.playbackRate, p: v.paused, pronto: v.readyState, anuncio: !!document.querySelector('.ad-showing') }; })()`);
+    } catch (e) { return null; }
+});
+ipcMain.handle('painel:clipe-proporcao', (ev, r) => {
+    const w = BrowserWindow.fromWebContents(ev.sender);
+    if (!w || !janelasClipe.has(w) || !(r > 0.2 && r < 6)) return false;
+    // Mantém a largura e o canto de baixo (a janela cresce ou encolhe para cima)
+    const b = w.getBounds();
+    const altura = Math.max(108, Math.round(b.width / r));
+    w.setAspectRatio(r);
+    w.setBounds({ x: b.x, y: b.y + b.height - altura, width: b.width, height: altura });
+    return true;
+});
+function ajustaJanelaClipe(w) {
+    janelasClipe.add(w);
+    w.on('closed', () => janelasClipe.delete(w));
+    // Acima de tudo, até de janela em tela cheia
+    w.setAlwaysOnTop(true, 'floating');
+    w.setAspectRatio(16 / 9);
+}
 
 // ---------- Ícone do Red Code: estrela de raios vermelha (desenhada em código) ----------
 // Raios em cápsula saindo do centro, com comprimentos irregulares; 4x4 amostras por pixel (bordas lisas)
@@ -673,21 +718,26 @@ function mudaAtualizacao(mudancas) {
     if (j) j.webContents.send('painel:atualizacao', estadoAtualizacao);
 }
 // Confere ao abrir e depois de tempos em tempos: exe = release nova no GitHub; código = commits novos no GitHub
+// Devolve o que achou: 'nova', 'ultima', 'ocupado' (já baixando ou pronta) ou 'erro' (o botão de buscar mostra)
 async function verificaAtualizacao() {
-    if (['baixando', 'pronta'].includes(estadoAtualizacao.fase)) return;
+    if (['baixando', 'pronta'].includes(estadoAtualizacao.fase)) return { resultado: 'ocupado' };
     if (EMPACOTADO) {
         let info;
         try { info = await atualizacao.releaseNova(app.getVersion()); }
-        catch (e) { return registraAtualizacao('não deu para conferir as releases: ' + e.message); }
-        if (!info) return registraAtualizacao(`já está na última versão (${app.getVersion()})`);
-        if (dispensadaNestaSessao === info.versao) return;
+        catch (e) { registraAtualizacao('não deu para conferir as releases: ' + e.message); return { resultado: 'erro', erro: e.message }; }
+        if (!info) { registraAtualizacao(`já está na última versão (${app.getVersion()})`); return { resultado: 'ultima' }; }
+        if (dispensadaNestaSessao === info.versao) return { resultado: 'nova' };
         registraAtualizacao(`versão ${info.versao} disponível`);
         releaseDisponivel = info;
         mudaAtualizacao({ fase: 'disponivel', modo: 'exe', versao: info.versao, atual: app.getVersion(), tamanho: info.tamanho, notas: info.notas });
+        return { resultado: 'nova' };
     } else {
-        const n = await atualizacao.atrasoFonte(PASTA);
-        if (!n || dispensadaNestaSessao === 'git:' + n) return;
+        let n;
+        try { n = await atualizacao.atrasoFonte(PASTA); } catch (e) { return { resultado: 'erro', erro: e.message }; }
+        if (!n) return { resultado: 'ultima' };
+        if (dispensadaNestaSessao === 'git:' + n) return { resultado: 'nova' };
         mudaAtualizacao({ fase: 'disponivel', modo: 'git', commits: n });
+        return { resultado: 'nova' };
     }
 }
 let releaseDisponivel = null;
@@ -715,8 +765,14 @@ function iniciaVigiaAtualizacao() {
     setInterval(verificaAtualizacao, EMPACOTADO ? 6 * 3600e3 : 30 * 60e3).unref();
 }
 ipcMain.handle('painel:atualizacao-estado', (ev) => (janela && ev.sender === janela.webContents) ? estadoAtualizacao : null);
-ipcMain.handle('painel:atualizacao-acao', (ev, acao) => {
+ipcMain.handle('painel:atualizacao-acao', async (ev, acao) => {
     if (!janela || ev.sender !== janela.webContents) return null;
+    // Botão "Buscar atualizações": confere agora (mesmo se a pessoa dispensou o cartão antes) e diz o que achou
+    if (acao === 'verificar') {
+        dispensadaNestaSessao = '';
+        const r = await verificaAtualizacao();
+        return { ...estadoAtualizacao, ...r, versaoApp: EMPACOTADO ? app.getVersion() : '' };
+    }
     if (acao === 'baixar') baixaAtualizacao();
     else if (acao === 'dispensar') { dispensadaNestaSessao = estadoAtualizacao.modo === 'git' ? 'git:' + estadoAtualizacao.commits : estadoAtualizacao.versao; mudaAtualizacao({ fase: 'nada' }); }
     // Reiniciar: exe = instala a pasta nova ao sair e reabre; código = reabre (o git pull acontece ao abrir)

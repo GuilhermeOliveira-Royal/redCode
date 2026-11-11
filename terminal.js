@@ -44,8 +44,9 @@ function liga(servidorHttp, { porta, token, pastaPermitida, envDaConversa }) {
             if (!/^[^\\/]+\/[0-9a-f-]{36}$/i.test(pedidoConversa) || !envDaConversa) return recusa('conversa');
             try { envConversa = envDaConversa(pedidoConversa); } catch (e) { return recusa('conversa: ' + e.message); }
         }
-        // /mcp do Claude (autenticar um servidor MCP): o Claude do SDK com a conta da conversa
-        const comandoClaude = url.searchParams.get('claude') === 'mcp' && !login ? '/mcp' : '';
+        // /mcp (autenticar um servidor MCP) e /login (login do Claude vencido): o Claude do SDK com a conta da conversa
+        const pedidoClaude = url.searchParams.get('claude');
+        const comandoClaude = login ? '' : pedidoClaude === 'mcp' ? '/mcp' : pedidoClaude === 'login' ? '/login' : '';
         if (comandoClaude && !require('fs').existsSync(CLAUDE_EXE)) return recusa('claude.exe do SDK não encontrado em ' + CLAUDE_EXE);
         wss.handleUpgrade(req, socket, cabeca, (ws) => conecta(ws, cwd, url, login, envConversa, comandoClaude));
     });

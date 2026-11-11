@@ -20,6 +20,7 @@ const perfis = require('./perfis');
 const midia = require('./midia');
 const login = require('./login');
 const plugins = require('./plugins');
+const videoNavegador = require('./video-navegador');
 // Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
 const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
 // Primeiro nome do usuário do Windows (henrique.freitas -> Henrique), para a saudação do Chat
@@ -29,6 +30,23 @@ function nomeUsuario() {
 }
 const cacheComandos = new Map();
 const cacheUso = { dados: null, em: 0, pedido: null };
+const cacheModelos = { dados: null, em: 0, pedido: null };
+// Lista do supportedModels() -> { modelos: [{ id, nome, descricao, familia, esforcos, principal }] }
+// id = o nome completo (claude-fable-5-2), que é o que a conversa grava; "default" (o padrão da conta) fica de fora
+function organizaModelos(lista) {
+    const versao = (id) => { const m = String(id).match(/^claude-[a-z]+-(\d+)(?:-(\d{1,2}))?(?:-|$)/); return m ? Number(m[1]) * 100 + Number(m[2] || 0) : 0; };
+    const vistos = new Set(), modelos = [];
+    for (const m of lista || []) {
+        const id = m.resolvedModel || m.value;
+        if (m.value === 'default' || !/^claude-[a-z]+-\d/.test(id) || vistos.has(id)) continue;
+        vistos.add(id);
+        modelos.push({ id, nome: m.displayName || id, descricao: m.description || '', familia: id.split('-')[1], versao: versao(id), esforcos: m.supportedEffortLevels || [] });
+    }
+    const maisNova = {};
+    for (const m of modelos) if (!maisNova[m.familia] || m.versao > maisNova[m.familia]) maisNova[m.familia] = m.versao;
+    for (const m of modelos) { m.principal = m.versao === maisNova[m.familia]; delete m.versao; }
+    return { modelos, lidoEm: new Date().toISOString() };
+}
 
 const PORTA = Number(process.env.PAINEL_PORTA || 4317);
 // Pasta do Claude do perfil ativo (CLAUDE_CONFIG_DIR vem do perfil; no padrão é ~/.claude)
@@ -1276,6 +1294,10 @@ function requisicaoConfiavel(req) {
 // Favoritas e vínculos entre conversas ("continuação de"), guardados num arquivo ao lado do servidor
 // PAINEL_DADOS: no Red Code.exe, %APPDATA%\Red Code (a pasta do programa é trocada a cada versão)
 const PASTA_DADOS = process.env.PAINEL_DADOS || __dirname;
+// Extensão do navegador (vídeo no canto): copiada para uma pasta fixa, que é a que se carrega no navegador
+videoNavegador.configura(PASTA_DADOS);
+let PASTA_EXTENSAO = null;
+try { PASTA_EXTENSAO = videoNavegador.copiaExtensao(__dirname, PASTA_DADOS); } catch (e) { console.log('extensão do navegador: ' + e.message); }
 const ARQUIVO_DADOS = path.join(PASTA_DADOS, 'dados.json');
 function leDados() {
     const vazio = { favoritos: [], vinculos: {}, nomes: {}, arquivadas: [], pastasExtras: [], navegador: 'padrao' };
@@ -1913,9 +1935,9 @@ async function rotaChat(req, res, url) {
                 if (!pastaConhecida(cwd)) return responde(res, 403, { erro: 'Pasta de projeto desconhecida.' });
                 const q = (k) => url.searchParams.get(k);
                 if (url.pathname === '/api/git/estado') return responde(res, 200, await gitScm.estado(cwd));
-                if (url.pathname === '/api/git/diff') return responde(res, 200, { diff: await gitScm.diff(cwd, q('arquivo'), q('staged') === '1') });
+                if (url.pathname === '/api/git/diff') return responde(res, 200, { diff: await gitScm.diff(cwd, q('arquivo'), q('staged') === '1', q('inteiro') === '1') });
                 if (url.pathname === '/api/git/log') return responde(res, 200, await gitScm.log(cwd, q('n')));
-                if (url.pathname === '/api/git/commit') return responde(res, 200, q('arquivo') ? { diff: await gitScm.commit(cwd, q('hash'), q('arquivo')) } : await gitScm.commit(cwd, q('hash')));
+                if (url.pathname === '/api/git/commit') return responde(res, 200, q('arquivo') ? { diff: await gitScm.commit(cwd, q('hash'), q('arquivo'), q('inteiro') === '1') } : await gitScm.commit(cwd, q('hash')));
                 if (url.pathname === '/api/git/branches') return responde(res, 200, await gitScm.branches(cwd));
                 if (url.pathname === '/api/git/a-subir') return responde(res, 200, { commits: await gitScm.aSubir(cwd), hooks: await gitScm.hooksComEfeito(cwd) });
                 if (url.pathname === '/api/git/hooks') return responde(res, 200, { hooks: await gitScm.hooksComEfeito(cwd) });
@@ -2490,6 +2512,41 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=3600', 'X-Content-Type-Options': 'nosniff' });
             return res.end(capa);
         }
+        // Vídeo no canto: a extensão do navegador manda o estado (só ela: cabeçalho próprio e origem de extensão,
+        // que página de site não consegue mandar sem a pré-checagem que este servidor não aprova)
+        if (url.pathname === '/api/midia/video' && req.method === 'POST') {
+            const origem = String(req.headers.origin || '');
+            if (req.headers['x-redcode-extensao'] !== '1' || (origem && !/^chrome-extension:\/\/[a-p]{32}$/.test(origem))) return responde(res, 403, { erro: 'só a extensão do Red Code' });
+            try { videoNavegador.recebe(await leCorpo(req, 1e4)); return responde(res, 200, { ok: true }); }
+            catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
+        if (url.pathname === '/api/midia/video' && req.method === 'GET') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            return responde(res, 200, { ...videoNavegador.atual(), ytdlp: !!videoNavegador.caminhoYtdlp(), pastaExtensao: PASTA_EXTENSAO, navegadores: videoNavegador.navegadores() });
+        }
+        // Instalar a extensão (a pessoa aceitou na tela): atalhos do navegador com --load-extension e, se pedido, reinicia ele
+        if (url.pathname === '/api/midia/extensao' && req.method === 'POST') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            try {
+                const corpo = await leCorpo(req, 1e4);
+                return responde(res, 200, await videoNavegador.instalaExtensao(String(corpo.navegador || ''), PASTA_EXTENSAO, PASTA_DADOS, !!corpo.reiniciar));
+            } catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
+        // Opção B: endereço direto só do vídeo (yt-dlp), para vídeo que não deixa incorporar
+        if (url.pathname === '/api/midia/video-url' && req.method === 'GET') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            try { return responde(res, 200, { url: await videoNavegador.urlDoVideo(url.searchParams.get('id')) }); }
+            catch (e) { return responde(res, e.codigo === 'sem-ytdlp' ? 404 : 502, { erro: e.message, codigo: e.codigo || 'falhou' }); }
+        }
+        if (url.pathname === '/api/midia/ytdlp' && req.method === 'POST') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            try { return responde(res, 200, { ok: true, caminho: await videoNavegador.instalaYtdlp() }); }
+            catch (e) { return responde(res, 502, { erro: e.message }); }
+        }
+        if (url.pathname === '/clipe.html' || url.pathname === '/clipe.js') {
+            res.writeHead(200, { 'Content-Type': url.pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+            return res.end(fs.readFileSync(path.join(__dirname, url.pathname.slice(1))));
+        }
         // Mascotes dos agentes: o visual de cada um (Configurações › Regras e agentes › Personalizar)
         if (url.pathname === '/api/visual-pets') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
@@ -2520,9 +2577,24 @@ const servidor = http.createServer(async (req, res) => {
         }
         if (url.pathname === '/api/midia') {
             if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            // Com ?versao=: segura a resposta até o estado mudar (play/pausa de fora aparece na hora, sem esperar a próxima pergunta)
+            if (req.method === 'GET' && url.searchParams.has('versao')) return responde(res, 200, await midia.espera(url.searchParams.get('versao'), 20000));
             if (req.method === 'GET') return responde(res, 200, midia.le());
             try { const corpo = await leCorpo(req, 1e4); midia.comando(String(corpo.acao || '')); return responde(res, 200, { ok: true }); }
             catch (e) { return responde(res, 400, { erro: e.message }); }
+        }
+        // Modelos que a conta pode usar (lista do Claude Code, atualiza quando a Anthropic lança um modelo).
+        // principal = a versão mais nova de cada família (Opus, Fable, Sonnet, Haiku); o resto é "versões anteriores"
+        if (url.pathname === '/api/modelos-claude') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            const vencido = !cacheModelos.dados || Date.now() - cacheModelos.em > 6 * 3600e3 || (url.searchParams.has('atualizar') && Date.now() - cacheModelos.em > 60000);
+            if (vencido) {
+                if (!cacheModelos.pedido) cacheModelos.pedido = chat.modelosDisponiveis().then((lista) => { cacheModelos.dados = organizaModelos(lista); cacheModelos.em = Date.now(); })
+                    .catch((e) => { if (!cacheModelos.dados) cacheModelos.dados = { erro: e.message, modelos: [] }; cacheModelos.em = Date.now() - 6 * 3600e3 + 120000; })
+                    .finally(() => { cacheModelos.pedido = null; });
+                await cacheModelos.pedido;
+            }
+            return responde(res, 200, cacheModelos.dados);
         }
         if (url.pathname === '/api/uso') {
             const agora = Date.now();

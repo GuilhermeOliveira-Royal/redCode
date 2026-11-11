@@ -42,6 +42,10 @@ while (-not $gerente) {
 }
 $ultimoJson = ''
 $musicaDaCapa = ''
+# Leitura rápida a cada ~120 ms (só o app e o tocar/pausar, que é barato); mudou -> lê tudo na hora. A completa
+# (título, capa, posição) também roda a cada 900 ms
+$ultimoRapido = ''
+$proximaCompleta = [DateTime]::MinValue
 while ($true) {
     # Comando da tela (não bloqueia: a leitura da entrada corre por fora)
     $comando = $null
@@ -57,8 +61,14 @@ while ($true) {
                 }
             }
         } catch { }
-        Start-Sleep -Milliseconds 250
+        Start-Sleep -Milliseconds 100
+        $proximaCompleta = [DateTime]::MinValue
     }
+    $rapido = ''
+    try { $s = $gerente.GetCurrentSession(); if ($s) { $rapido = "$($s.SourceAppUserModelId)|$($s.GetPlaybackInfo().PlaybackStatus)" } } catch { }
+    if ($rapido -eq $ultimoRapido -and [DateTime]::UtcNow -lt $proximaCompleta) { Start-Sleep -Milliseconds 120; continue }
+    $ultimoRapido = $rapido
+    $proximaCompleta = [DateTime]::UtcNow.AddMilliseconds(900)
     try {
         $sessao = $gerente.GetCurrentSession()
         if (-not $sessao) { $estado = [ordered]@{ nada = $true }; $musicaDaCapa = '' }
@@ -86,5 +96,5 @@ while ($true) {
         $json = (@{ erro = $(if ($msg -match 'sem-resposta') { 'servico' } else { $msg }) } | ConvertTo-Json -Compress)
         if ($json -ne $ultimoJson) { [Console]::Out.WriteLine($json); [Console]::Out.Flush(); $ultimoJson = $json }
     }
-    Start-Sleep -Milliseconds 900
+    Start-Sleep -Milliseconds 120
 }
