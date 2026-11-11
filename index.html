@@ -2885,10 +2885,19 @@ new ResizeObserver(() => {
     if (!playerMidia.classList.contains('aberto')) { alturaPlayerFechado = h; document.body.style.setProperty('--player-aberto', '0px'); }
     else if (alturaPlayerFechado) document.body.style.setProperty('--player-aberto', Math.max(0, h - alturaPlayerFechado) + 'px');
 }).observe(playerMidia);
-playerMidia.addEventListener('mouseenter', () => {
-    rolaTextosPlayer(true);
+playerMidia.addEventListener('mouseenter', () => { rolaTextosPlayer(true); if (playerMidia.classList.contains('aberto')) clearTimeout(abrePlayerEm); });
+// Só abre com o mouse parado na capa; aberto, fica aberto no player todo (para usar os botões) e fecha ao sair dele
+playerMidia.addEventListener('mouseover', (ev) => {
+    if (playerMidia.classList.contains('aberto')) { clearTimeout(abrePlayerEm); return; }
+    if (!ev.target.closest('.pm-disco') || playerMidia.classList.contains('aviso-midia')) return;
     clearTimeout(abrePlayerEm);
-    abrePlayerEm = setTimeout(() => { if (playerMidia.classList.contains('aviso-midia')) return; rolaTextosPlayer(false); playerMidia.classList.add('aberto'); andaProgresso(); }, 220);
+    abrePlayerEm = setTimeout(() => { rolaTextosPlayer(false); playerMidia.classList.add('aberto'); andaProgresso(); }, 220);
+});
+// Saiu da capa antes de abrir: não abre
+playerMidia.addEventListener('mouseout', (ev) => {
+    if (playerMidia.classList.contains('aberto') || !ev.target.closest('.pm-disco')) return;
+    if (ev.relatedTarget && ev.relatedTarget.closest && ev.relatedTarget.closest('.pm-disco')) return;
+    clearTimeout(abrePlayerEm);
 });
 playerMidia.addEventListener('mouseleave', () => {
     rolaTextosPlayer(false);
@@ -4508,10 +4517,20 @@ function jaViu(s) {
     return chave === sessaoAtual || (vistasEm[chave] || 0) >= s.atualizado;
 }
 
+// Tarefas em segundo plano (comandos, testes...) de uma conversa aberta pelo Red Code: a resposta pode ter acabado,
+// mas ainda tem coisa rodando (e o Claude volta sozinho quando terminar)
+function tarefasFundoDe(s) {
+    let lista = [];
+    try { lista = estadoChat; } catch (e) { return []; }
+    const c = (lista || []).find(x => x.vivo && x.sessionId === s.id);
+    return (c && c.tarefasBg) || [];
+}
 function situacaoItem(s) {
     if (s.pergunta) return { icone: '?', classe: 'pergunta', selo: 'Pergunta', texto: 'esperando sua resposta' };
     if (s.ativa && s.agentesRodando && !s.acaoAtual) return { icone: '◆', classe: 'agente', selo: s.agentesRodando > 1 ? `${s.agentesRodando} agentes` : 'Agente rodando', texto: 'continua sozinha quando terminar' };
     if (s.ativa) return { icone: '', classe: 'trabalhando', selo: 'Trabalhando', texto: 'agora' };
+    const fundo = tarefasFundoDe(s);
+    if (fundo.length) return { icone: '', classe: 'trabalhando', selo: 'Em segundo plano', texto: 'agora', fazendo: fundo.length > 1 ? `${fundo.length} tarefas em segundo plano` : `Em segundo plano: ${fundo[0].descricao || 'tarefa'}` };
     if (s.esperando && Date.now() - s.atualizado < 30 * 60 * 1000 && !jaViu(s)) return { icone: '✓', classe: 'respondeu', selo: 'Respondeu', texto: haQuanto(s.atualizado) };
     return { icone: '', classe: 'parada', selo: '', texto: haQuanto(s.atualizado) };
 }
@@ -4557,7 +4576,7 @@ function itemSessao(s, { numeroParte = 1, total = 1, filho = false, raiz = '', a
     const favorita = dadosPainel.favoritos.includes(chave);
     const arquivada = dadosPainel.arquivadas.includes(chave);
     const largura = Math.min(100, (s.contexto || 0) / LIMITES.janela * 100).toFixed(1);
-    const fazendo = s.acaoAtual ? `${gerundiosLista[s.acaoAtual.tipo] || 'Trabalhando em'} ${s.acaoAtual.texto}…` : s.ativa && !s.agentesRodando ? 'Pensando…' : '';
+    const fazendo = situacao.fazendo || s.acaoAtual ? situacao.fazendo || `${gerundiosLista[s.acaoAtual.tipo] || 'Trabalhando em'} ${s.acaoAtual.texto}…` : s.ativa && !s.agentesRodando ? 'Pensando…' : '';
     return `<div class="sessao ${filho ? 'parte' : ''} estado-${situacao.classe}" role="button" tabindex="0" data-chave="${esc(chave)}" aria-current="${!iniciando && sessaoAtual === chave}">
         <span class="linha-titulo">
             <i class="status-item ${situacao.classe}" title="${esc(situacao.selo || situacao.texto)}">${situacao.icone}</i>

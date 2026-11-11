@@ -3,6 +3,12 @@
 // A versão mais nova fica em cima. Cada item: "Título curto: o que mudou, do jeito que a pessoa usa"
 module.exports = [
     {
+        versao: '1.0.10', data: '2026-11-11', itens: [
+            'Tarefas em segundo plano na lista: conversa com um comando ou teste rodando em segundo plano aparece como trabalhando, com o nome da tarefa',
+            'Player com disco pela capa: o disco abre só com o mouse parado na capa do álbum; aberto, continua aberto enquanto o mouse estiver no player',
+        ],
+    },
+    {
         versao: '1.0.9', data: '2026-11-11', itens: [
             'Novidades ao atualizar: depois de cada atualização, esta janela mostra o que entrou. Para rever, vá em Configurações › Sistema › Ver novidades',
             'Player com disco: passe o mouse no player do rodapé e a capa vira um vinil girando, com o nome inteiro, o tempo da música e o botão de anterior',
