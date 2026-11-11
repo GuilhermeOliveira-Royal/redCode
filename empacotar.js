@@ -60,6 +60,10 @@ function principal() {
     const deps = dependenciasDeProducao();
     passo(`Copiando ${deps.length} pacotes de produção`);
     for (const nome of deps) fs.cpSync(path.join(RAIZ, 'node_modules', nome), path.join(app, 'node_modules', nome), { recursive: true });
+    // O chat e a tela de login dependem do executável do Claude Code que vem com o SDK
+    if (!fs.existsSync(path.join(app, 'node_modules', '@anthropic-ai', 'claude-agent-sdk-win32-x64', 'claude.exe'))) {
+        throw new Error('claude.exe não foi copiado para o pacote: falta @anthropic-ai/claude-agent-sdk-win32-x64 em node_modules (rode npm install).');
+    }
     // O editor só usa monaco-editor/min (server.js): as outras builds (~77 MB) ficam de fora
     for (const sobra of ['dev', 'esm']) fs.rmSync(path.join(app, 'node_modules', 'monaco-editor', sobra), { recursive: true, force: true });
 

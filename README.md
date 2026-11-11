@@ -118,7 +118,7 @@ Na janela de **Nova conversa** você escolhe o projeto, a cópia isolada (worktr
 ## Requisitos
 
 - **Windows.** O terminal e o empacotamento são para Windows.
-- **Claude Code instalado e com login feito** na sua conta. O app usa essa conta.
+- **Uma conta do Claude** (assinatura Pro/Max, ou conta do Console). Não precisa instalar o Claude Code: o app já traz o executável. Se o PC não estiver logado, o app mostra uma tela de login que abre o navegador.
 - **Git**, para o painel Git e os worktrees.
 - Opcionais: **VS Code** (ponte com o editor) e **GitHub CLI (`gh`)** (aba de PRs e CI).
 - **Node 24 ou superior**, só para rodar pelo código ou gerar o exe. O exe portátil não precisa de Node.
@@ -175,7 +175,7 @@ Gera `dist\Red Code\Red Code.exe` e `dist\RedCode-portatil-win64.zip`. Não baix
 
 ## Primeiros passos
 
-1. Abra o app. A lista da esquerda mostra as conversas que você já tem no Claude Code.
+1. Abra o app. Se aparecer a tela **Entrar no Claude**, clique no botão, entre na sua conta no navegador, copie o código que o site mostrar e cole no campo da tela. O app libera em seguida. Depois, a lista da esquerda mostra as conversas que você já tem no Claude Code.
 2. Clique em **Nova conversa**.
    - No modo **Código**, escolha o projeto na lista, **Outra pasta…** (abre o seletor de pastas do Windows) ou **Sem pasta específica**. Marque a cópia isolada (worktree) se for rodar ao mesmo tempo que outra conversa no mesmo projeto.
    - No modo **Chat**, só escolha modelo, esforço e escreva a mensagem.
@@ -240,6 +240,7 @@ Funcionam como os perfis do navegador. O seletor de perfil, no rodapé da lista 
 - O navegador embutido roda numa janela isolada, sem acesso ao token do painel.
 - Segredos que o app desktop passa ao servidor são lidos uma vez e apagados do ambiente, para não vazarem para os processos que o servidor inicia.
 - O editor e as operações de arquivo ficam presos dentro da pasta do projeto.
+- O login é feito pelo próprio Claude Code, no navegador. O Red Code não vê senha nem token e não tem botão de sair da conta.
 - No modo Chat, o Claude roda sem ferramentas, sem servidores MCP e sem carregar o seu `CLAUDE.md`.
 
 ## Problemas comuns
@@ -250,7 +251,7 @@ Funcionam como os perfis do navegador. O seletor de perfil, no rodapé da lista 
 - **O atalho `Ctrl` + `Shift` + `Espaço` não funciona.** Outro programa está usando. O app avisa no log e segue funcionando sem ele.
 - **A página abre em branco.** Confirme que o servidor está rodando e acesse `http://127.0.0.1:4317`, ou abra pelo app desktop.
 - **A porta 4317 está ocupada.** Defina outra com a variável de ambiente `PAINEL_PORTA` antes de abrir.
-- **A lista vem vazia.** O app só mostra o que o Claude Code já gravou em `~/.claude/projects`. Confirme que o Claude Code está instalado e que você já fez alguma conversa.
+- **A lista vem vazia.** O app só mostra o que o Claude Code já gravou em `~/.claude/projects`. Se você nunca usou o Claude Code neste PC, a lista começa vazia: crie a primeira conversa em **Nova conversa**.
 
 ## Estrutura do projeto
 
@@ -269,6 +270,7 @@ Funcionam como os perfis do navegador. O seletor de perfil, no rodapé da lista 
 | `alem.js` | Busca global, resumo do dia, linha do tempo de arquivo |
 | `vscode-ponte.js` | Ponte com o VS Code aberto |
 | `segredos.js` | Leitura única dos segredos do app desktop |
+| `login.js` | Estado do login e fluxo de entrada, pelo executável oficial do Claude Code |
 | `lancador.js` | Sobe o servidor e o reinicia quando ele pede |
 | `empacotar.js` | Gera o exe portátil |
 | `ferramentas/medir.js` | Mede elementos e tira prints da página para depuração |

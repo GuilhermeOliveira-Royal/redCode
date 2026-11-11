@@ -18,6 +18,8 @@ const gitScm = require('./git-scm');
 const chat = require('./chat');
 const perfis = require('./perfis');
 const midia = require('./midia');
+const login = require('./login');
+const plugins = require('./plugins');
 // Nome da pasta de transcripts das conversas Chat (o SDK grava pelo cwd sanitizado)
 const PASTA_CHAT = chat.pastaDoProjeto(chat.CHAT_DIR).toLowerCase();
 // Primeiro nome do usuário do Windows (henrique.freitas -> Henrique), para a saudação do Chat
@@ -672,7 +674,12 @@ function leSubagentes(pastaSessao, estadoPai) {
 
 // Trabalhando, esperando você, ou parada. Um agente em segundo plano conta como trabalho:
 // quando ele termina, o Claude volta a responder sozinho.
-function situacaoSessao(estado, mtime) {
+function situacaoSessao(estado, mtime, id) {
+    // Estava rodando no painel quando ele fechou e ninguém mexeu desde então: processo morto, conversa livre
+    if (id && orfas.has(id)) {
+        if (mtime <= INICIO_PAINEL) return { ativa: false, esperando: false, agentesRodando: 0 };
+        orfas.delete(id);
+    }
     // Só conta agente com atividade recente ou lançado há menos de 30 min
     const agentesRodando = Object.values(estado.agentes).filter(a => a.status === 'rodando'
         && (a.ativoHa !== undefined || Date.now() - Date.parse(a.inicio || 0) < 30 * 60 * 1000)).length;
@@ -722,6 +729,7 @@ function envDeConversa(projeto, id) { return perfis.envDaConversa(entradaDaConve
 function assinaturaDe(entrada) { return entrada ? (entrada.claude || '') + '|' + (entrada.git || '') : ''; }
 
 function listaSessoes() {
+    registraVivas();
     const limite = Date.now() - DIAS_LISTADOS * 24 * 3600 * 1000;
     const sessoes = [];
     const porConversaLista = leDados().porConversa || {};
@@ -741,10 +749,12 @@ function listaSessoes() {
             const estado = leIncremental(arquivo, estadoVazio, processaRegistro);
             // Agentes em segundo plano só importam em sessões mexidas na última hora
             if (Date.now() - stat.mtimeMs < 3600 * 1000) leSubagentes(path.join(caminhoPasta, nome.replace('.jsonl', '')), estado);
-            const situacao = situacaoSessao(estado, stat.mtimeMs);
+            const situacao = situacaoSessao(estado, stat.mtimeMs, nome.replace('.jsonl', ''));
             // Conversa trabalhando (aberta ou não): vigia os repositórios dela, para cada comando ser comparado com a versão certa
             if (situacao.ativa) reposDaSessao(estado, cwdDaPasta(estado, pasta)).forEach(r => vigiaRepo(r));
             const pedidos = estado.eventos.filter(e => e.tipo === 'pedido');
+            // Conversa criada só por digitar "/mcp" (comando do terminal, não conversa de verdade): fica fora da lista
+            if (pedidos.length && pedidos.every(p => String(p.texto).trim().toLowerCase() === '/mcp')) continue;
             sessoes.push({
                 projeto: pasta, nomeProjeto: nomeProjeto(pasta), id: nome.replace('.jsonl', ''), chat: pasta.toLowerCase() === PASTA_CHAT,
                 titulo: estado.titulo || (pedidos[0] && corta(pedidos[0].texto, 80)) || '(sem título)',
@@ -1180,7 +1190,7 @@ function detalheSessao(projeto, id) {
     const estado = leIncremental(arquivo, estadoVazio, processaRegistro);
     leSubagentes(path.join(achado.raiz, projeto, id), estado);
     const stat = fs.statSync(arquivo);
-    const situacao = situacaoSessao(estado, stat.mtimeMs);
+    const situacao = situacaoSessao(estado, stat.mtimeMs, id);
     const primeiroPedido = estado.eventos.find(e => e.tipo === 'pedido');
     return {
         titulo: estado.titulo || (primeiroPedido && corta(primeiroPedido.texto, 80)), modelo: estado.modelo, esforco: estado.esforco, custo: estado.custo,
@@ -1274,6 +1284,20 @@ function leDados() {
 }
 function gravaDados(dados) {
     fs.writeFileSync(ARQUIVO_DADOS, JSON.stringify(dados, null, 2));
+}
+// Conversas que o painel estava tocando quando foi fechado: o processo morreu junto, então ficam livres
+// na hora (sem esperar o transcript "esfriar"). Vale enquanto o arquivo não for mexido por outro lugar.
+const INICIO_PAINEL = Date.now();
+const ARQUIVO_VIVAS = path.join(PASTA_DADOS, 'vivas.json');
+let orfas = new Set();
+try { orfas = new Set(JSON.parse(fs.readFileSync(ARQUIVO_VIVAS, 'utf8'))); } catch (e) { /* primeira vez */ }
+let vivasGravadas = '[]';
+function registraVivas() {
+    const ids = chat.estado().filter(c => c.vivo && c.sessionId && (c.status === 'rodando' || c.status === 'parando')).map(c => c.sessionId).sort();
+    const json = JSON.stringify(ids);
+    if (json === vivasGravadas) return;
+    vivasGravadas = json;
+    try { fs.writeFileSync(ARQUIVO_VIVAS, json); } catch (e) { /* só otimização */ }
 }
 function chaveValida(chave) {
     return typeof chave === 'string' && /^[A-Za-z0-9-]+\/[A-Za-z0-9-]+$/.test(chave);
@@ -1845,6 +1869,8 @@ function gitDiff(cwd, arquivo) {
 // Plugins ligados/desligados no ~/.claude/settings.json (com backup antes de gravar)
 const ARQ_SETTINGS = path.join(PASTA_CLAUDE, 'settings.json');
 function lePlugins() {
+    // Conta nova, sem settings.json ainda: começa sem plugins (é quando mais se precisa do instalador)
+    if (!fs.existsSync(ARQ_SETTINGS)) return [];
     const json = JSON.parse(fs.readFileSync(ARQ_SETTINGS, 'utf8'));
     return Object.entries(json.enabledPlugins || {}).map(([nome, ligado]) => ({ nome, ligado: !!ligado }));
 }
@@ -2084,6 +2110,7 @@ async function rotaChat(req, res, url) {
     }
     if (url.pathname === '/api/plugins') {
         try {
+            if (plugins.emAndamento()) return responde(res, 409, { erro: 'Há uma operação de plugin em andamento. Espere terminar.' });
             const backup = gravaPlugin(String(corpo.nome || ''), !!corpo.ligado);
             return responde(res, 200, { ok: true, backup, plugins: lePlugins(), aviso: 'Vale para as conversas abertas a partir de agora.' });
         } catch (e) { return responde(res, 400, { erro: e.message }); }
@@ -2315,6 +2342,27 @@ async function rotaChat(req, res, url) {
     if (url.pathname === '/api/chat/parar') {
         return (await chat.parar(corpo.chave)) ? responde(res, 200, { ok: true }) : responde(res, 404, { erro: 'Nada rodando para parar.' });
     }
+    // Login: o servidor só aciona o fluxo oficial do Claude Code (abre o navegador); nunca recebe senha nem token
+    if (url.pathname === '/api/auth/entrar') {
+        try { return responde(res, 200, await login.entrar(corpo.tipo)); } catch (e) { return responde(res, e.status || 500, { erro: e.message }); }
+    }
+    if (url.pathname === '/api/auth/codigo') {
+        try { return responde(res, 200, await login.codigo(corpo.codigo)); } catch (e) { return responde(res, e.status || 500, { erro: e.message }); }
+    }
+    // Plugins: instalar, atualizar, desinstalar e marketplaces, sempre pelo executável oficial e com a confirmação da tela
+    if (url.pathname === '/api/plugins/acao') {
+        try {
+            const alvo = corpo.alvo;
+            const r = corpo.acao === 'instalar' ? await plugins.instalar(alvo, corpo.aceitarComando)
+                : corpo.acao === 'atualizar' ? await plugins.atualizar(alvo, corpo.aceitarComando)
+                : corpo.acao === 'desinstalar' ? await plugins.desinstalar(alvo)
+                : corpo.acao === 'mercado-adicionar' ? await plugins.mercadoAdicionar(alvo)
+                : corpo.acao === 'mercado-remover' ? await plugins.mercadoRemover(alvo) : null;
+            if (!r) return responde(res, 400, { erro: 'ação inválida' });
+            return responde(res, 200, r);
+        } catch (e) { return responde(res, e.status || 500, { erro: e.status ? e.message : 'Não foi possível concluir.' }); }
+    }
+    if (url.pathname === '/api/auth/cancelar') return responde(res, 200, { cancelado: login.cancelar() });
     if (url.pathname === '/api/chat/parar-tarefa') {
         return (await chat.pararTarefa(corpo.chave, corpo.id)) ? responde(res, 200, { ok: true }) : responde(res, 404, { erro: 'Esta tarefa já terminou.' });
     }
@@ -2425,7 +2473,15 @@ const servidor = http.createServer(async (req, res) => {
             res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'max-age=86400', 'X-Content-Type-Options': 'nosniff' });
             return res.end(fs.readFileSync(arq));
         }
-        if (url.pathname.startsWith('/api/chat/') || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname.startsWith('/api/chat/') || url.pathname === '/api/auth/entrar' || url.pathname === '/api/auth/cancelar' || url.pathname === '/api/auth/codigo' || url.pathname === '/api/plugins/acao' || url.pathname.startsWith('/api/git/') || ['/api/projetos', '/api/dados', '/api/favorito', '/api/renomear', '/api/arquivar', '/api/versao', '/api/reiniciar', '/api/diff', '/api/mcp', '/api/mcp/acao', '/api/plugins', '/api/editor/arvore', '/api/editor/arquivo', '/api/editor/salvar', '/api/editor/diagnosticos', '/api/por-comando', '/api/por-comando/vivo', '/api/worktree/repo', '/api/worktrees', '/api/resolver-arquivo', '/api/worktree/criar', '/api/worktree/remover', '/api/busca', '/api/resumo-dia', '/api/modelos-pedido', '/api/github', '/api/hooks', '/api/trello', '/api/automacao', '/api/agendamentos', '/api/agendamentos/rodar', '/api/fila', '/api/pastas', '/api/navegador', '/api/agentes', '/api/perfis', '/api/conversa/conta'].includes(url.pathname)) return await rotaChat(req, res, url);
+        if (url.pathname === '/api/auth/estado') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            return responde(res, 200, await login.estado());
+        }
+        if (url.pathname === '/api/plugins/estado') {
+            if (!requisicaoConfiavel(req)) return responde(res, 403, { erro: 'pedido recusado: origem não é o painel' });
+            return responde(res, 200, await plugins.estado());
+        }
         if (url.pathname === '/api/sessoes') return responde(res, 200, listaSessoes());
         // Player do rodapé: o que está tocando no Windows, a capa e os botões (tocar/pausar, próxima)
         if (url.pathname === '/api/midia/capa' && req.method === 'GET') {
@@ -2541,6 +2597,8 @@ const servidor = http.createServer(async (req, res) => {
         }
         responde(res, 404, { erro: 'não encontrado' });
     } catch (e) {
+        // Erro depois de a resposta já ter começado: não dá para mandar um 500 (derrubaria o servidor); só encerra e registra
+        if (res.headersSent) { console.log(`Erro depois de responder ${req.method} ${req.url}: ${e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : e}`); return res.end(); }
         responde(res, 500, { erro: e.message });
     }
 });

@@ -1539,7 +1539,8 @@ body.ver-detalhes .topo-sessao .numeros { display: flex; }
 .compositor { border-top: 0; padding-top: 6px; }
 .caixa-mensagem { border-color: var(--linha); background: var(--folha); }
 .barra-caixa { border-top: 0; padding-top: 2px; }
-#chipContexto, #chipTempo { display: none; }
+#chipTempo { display: none; }
+#chipContexto { cursor: pointer; }
 .chip-barra { background: none; border-color: transparent; }
 .chip-barra:hover { color: var(--tinta); }
 .botoes-cantos { position: fixed; top: 10px; right: 14px; z-index: 30; display: flex; gap: 2px; }
@@ -1962,6 +1963,28 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 .config-info span:nth-child(odd) { color: var(--grafite); }
 .config-info span:nth-child(even) { font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
 @media (max-width: 760px) { .config-grade { grid-template-columns: 1fr; } .config-nav { border-right: 0; border-bottom: 1px solid var(--linha); max-height: 190px; } }
+/* Tela de login */
+.tela-login { position: fixed; inset: 0; z-index: 80; background: var(--papel); display: grid; place-items: center; padding: 16px; }
+.tela-login[hidden] { display: none; }
+.tela-login:not([hidden]) { animation: fundo-entra .2s ease-out; }
+.tela-login:not([hidden]) .caixa-login { animation: surgir .26s var(--entrada); }
+.caixa-login { width: min(420px, 100%); text-align: center; }
+.caixa-login h2 { font: 600 24px var(--estreita); margin: 0 0 10px; }
+.caixa-login p { color: var(--grafite); margin: 0 0 18px; line-height: 1.5; }
+.caixa-login .botao { width: 100%; padding: 10px 14px; }
+.caixa-login .link-login { display: block; margin: 14px auto 0; color: var(--grafite); font-size: 12.5px; text-decoration: underline; text-underline-offset: 3px; }
+.caixa-login .link-login:hover { color: var(--tinta); }
+.caixa-login .espera-login { color: var(--tinta); }
+.caixa-login .plano-b-login a { color: var(--agente); word-break: break-all; }
+.caixa-login .erro-login { color: var(--erro); margin: 14px 0 0; }
+.caixa-login .form-codigo-login { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+.caixa-login .form-codigo-login input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 8px; background: var(--folha); color: var(--tinta); font: 13px var(--mono); }
+.caixa-login .form-codigo-login input:focus { outline: none; border-color: var(--voce); }
+.linha-plugin { display: flex; gap: 8px; margin: 8px 0 14px; }
+.linha-plugin input { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--folha); color: var(--tinta); font: 13px var(--mono); }
+.linha-plugin input:focus { outline: none; border-color: var(--voce); }
+.plugin-liga { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.comando-plugin { max-height: 220px; overflow: auto; margin: 8px 0; padding: 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--codigo); font: 12px var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
 <script>
 // Aparência escolhida em Configurações: aplicada antes do 1º desenho (o tema não pisca)
@@ -2072,7 +2095,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                     <input type="file" id="arquivoAnexo" multiple hidden>
                     <button type="button" class="chip-barra chip-modelo" id="chipModelo" title="Trocar o modelo ou o esforço (vale a partir da próxima mensagem)" aria-haspopup="menu"></button>
                     <span class="chip-barra" id="chipAgentes" hidden></span>
-                    <span class="chip-barra" id="chipContexto" title="Contexto usado da janela de 1 milhão de tokens"></span>
+                    <button type="button" class="chip-barra" id="chipContexto" title="Contexto usado da janela de 1 milhão de tokens. Clique para compactar a conversa (/compact): resume o histórico e libera o contexto, sem abrir conversa nova"></button>
                     <span class="chip-barra" id="chipTempo" title="Tempo desde o início da conversa"></span>
                     <button type="button" class="chip-barra chip-branch" id="chipBranch" title="Branch atual (abre o painel Git)" hidden></button>
                     <button type="button" class="chip-barra chip-terminal" id="btnTerminal" title="Terminal na pasta desta conversa (Ctrl + `)">&gt;_ Terminal</button>
@@ -2115,6 +2138,26 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
 <div class="alca-coluna" data-alca="sessoes" title="Arraste para mudar a largura da lista (duplo clique volta ao padrão)" hidden></div>
 <div class="alca-coluna" data-alca="lateral" title="Arraste para mudar a largura do painel (duplo clique volta ao padrão)" hidden></div>
 <div class="alca-coluna" data-alca="conversa" title="Arraste para mudar a largura da conversa (duplo clique volta ao padrão)" hidden></div>
+<div class="tela-login" id="telaLogin" role="dialog" aria-modal="true" aria-labelledby="tituloLogin" hidden>
+    <div class="caixa-login">
+        <h2 id="tituloLogin">Entrar no Claude</h2>
+        <p>O Red Code conversa com o Claude pela sua conta. Ele não guarda senha: o login é feito no navegador, pelo próprio Claude Code.</p>
+        <div id="loginPasso1">
+            <button type="button" class="botao principal" id="btnLoginClaude">Entrar com a conta do Claude</button>
+            <button type="button" class="link-login" id="btnLoginConsole">Usar conta do Console (cobrança por uso da API)</button>
+        </div>
+        <div id="loginPasso2" hidden>
+            <p class="espera-login"><i class="giro-mini" aria-hidden="true"></i> Abrimos o navegador. Entre na sua conta lá, copie o código que o site mostrar e cole abaixo.</p>
+            <p class="plano-b-login" id="loginPlanoB" hidden>O navegador não abriu? <a id="loginUrl" target="_blank" rel="noopener noreferrer"></a></p>
+            <form id="formLoginCodigo" class="form-codigo-login" autocomplete="off">
+                <input type="text" id="loginCodigo" placeholder="Cole aqui o código do site" aria-label="Código do site do Claude" spellcheck="false" required>
+                <button type="submit" class="botao principal" id="btnLoginCodigo">Continuar</button>
+            </form>
+            <button type="button" class="botao" id="btnLoginCancelar">Cancelar</button>
+        </div>
+        <p class="erro-login" id="loginErro" role="alert" hidden></p>
+    </div>
+</div>
 <div class="recado" id="recado" role="status" aria-live="polite"></div>
 <div class="ajuda" id="janelaPet" hidden>
     <div class="caixa janela-pet" role="dialog" aria-modal="true" aria-labelledby="tituloPet">
@@ -6267,6 +6310,7 @@ async function abreConfig(aba) {
             corpo.innerHTML = `<p class="nota">Servidores MCP desta conversa.${viva ? '' : ' Reconectar e ligar/desligar só funcionam com a conversa aberta no painel (mande uma mensagem por aqui primeiro).'}</p>`
                 + (lista.length ? lista.map(m => `<div class="item-config"><span class="estado-mcp ${esc(m.status)}">${esc(m.status)}</span>
                     <span class="nome-config">${esc(m.name)}<small>${m.tools ? plural(m.tools.length, 'ferramenta', 'ferramentas') : ''}${m.error ? ' · ' + esc(m.error) : ''}</small></span>
+                    ${m.status === 'needs-auth' && /^claude\.ai /.test(m.name) ? '<a class="mini principal" href="https://claude.ai/settings/connectors" target="_blank" title="Conectores conectados à conta só se autorizam no site do claude.ai">Autorizar no claude.ai ↗</a>' : ''}
                     ${viva ? `<button class="mini" data-mcp="reconectar" data-servidor="${esc(m.name)}">Reconectar</button>
                     <button class="mini" data-mcp="${m.status === 'disabled' ? 'ligar' : 'desligar'}" data-servidor="${esc(m.name)}">${m.status === 'disabled' ? 'Ligar' : 'Desligar'}</button>` : ''}</div>`).join('')
                 : '<p class="nota">Nenhum servidor MCP nesta conversa.</p>');
@@ -6326,8 +6370,24 @@ async function abreConfig(aba) {
             const r = await fetch('/api/plugins', { headers: { 'X-Painel': '1' } });
             const lista = await r.json();
             if (!r.ok) throw new Error(lista.erro || 'erro');
-            corpo.innerHTML = '<p class="nota">Plugins do Claude Code (seu settings.json). Antes de cada mudança é feito um backup em ~/.claude/backups. Vale para conversas abertas depois.</p>'
-                + lista.map(p => `<label class="item-config"><input type="checkbox" data-plugin="${esc(p.nome)}" ${p.ligado ? 'checked' : ''}><span class="nome-config">${esc(p.nome)}</span></label>`).join('');
+            // O instalador vem do executável oficial; se falhar, a lista de ligar e desligar continua funcionando
+            const gestao = await getPainel('/api/plugins/estado').catch(() => null);
+            const versoes = new Map(((gestao && gestao.instalados) || []).map(p => [p.id, p]));
+            const itemPlugin = (p) => {
+                const inst = versoes.get(p.nome);
+                return `<div class="item-config"><label class="plugin-liga"><input type="checkbox" data-plugin="${esc(p.nome)}" ${p.ligado ? 'checked' : ''}><span class="nome-config">${esc(p.nome)}${inst && inst.versao ? `<small>versão ${esc(inst.versao)}</small>` : ''}</span></label>${inst ? `
+                    <button class="mini" data-plug="atualizar" data-alvo="${esc(p.nome)}">Atualizar</button>
+                    <button class="mini perigo" data-plug="desinstalar" data-alvo="${esc(p.nome)}">Desinstalar</button>` : ''}</div>`;
+            };
+            corpo.innerHTML = '<p class="nota">Plugins do Claude Code. Antes de ligar ou desligar é feito um backup em ~/.claude/backups. Vale para conversas abertas depois.</p>'
+                + lista.map(itemPlugin).join('')
+                + (gestao ? `
+                <h3 class="sub-config">Instalar plugin</h3>
+                <p class="nota">Use ${'nome@marketplace'}, por exemplo <code>hostinger@claude-plugins-official</code>. Plugins podem rodar comandos e servidores MCP no seu PC: instale só de quem você confia. Vale para ${gestao.contaEspecifica ? 'a conta do perfil ativo' : 'a sua conta do Claude Code'}.</p>
+                <div class="linha-plugin"><input type="text" id="campoPluginNovo" placeholder="nome@marketplace" spellcheck="false" autocomplete="off"><button class="botao principal" data-plug="instalar" data-campo="campoPluginNovo">Instalar</button></div>
+                <h3 class="sub-config">Marketplaces</h3>
+                ${gestao.mercados.length ? gestao.mercados.map(m => `<div class="item-config"><span class="nome-config">${esc(m.nome)}<small>${esc(m.fonte)}</small></span><button class="mini perigo" data-plug="mercado-remover" data-alvo="${esc(m.nome)}">Remover</button></div>`).join('') : '<p class="nota">Nenhum marketplace.</p>'}
+                <div class="linha-plugin"><input type="text" id="campoMercadoNovo" placeholder="dono/repositorio ou https://github.com/dono/repositorio" spellcheck="false" autocomplete="off"><button class="botao" data-plug="mercado-adicionar" data-campo="campoMercadoNovo">Adicionar</button></div>` : '<p class="nota">Não consegui abrir o instalador de plugins agora.</p>');
         }
     } catch (e) { corpo.innerHTML = `<p class="nota">Não consegui carregar: ${esc(e.message)}</p>`; }
 }
@@ -6492,7 +6552,8 @@ function desenhaMcp() {
                 ${m.error ? `<p class="erro-mcp">${esc(m.error)}</p>` : ''}
                 ${ferramentas.length ? `<div class="config-ferramentas">${ferramentas.slice(0, 40).map(f => `<span title="${esc(f.description || '')}">${esc(f.name)}</span>`).join('')}${ferramentas.length > 40 ? `<span>+${ferramentas.length - 40}</span>` : ''}</div>` : ''}
                 <div class="acoes-mcp">
-                    ${m.status === 'needs-auth' ? `<button class="mini principal" data-mcp-entrar="${esc(m.name)}" title="Abre o /mcp do Claude no terminal para entrar na conta deste servidor">Entrar…</button>` : ''}
+                    ${m.status === 'needs-auth' && /^claude\.ai /.test(m.name) ? '<a class="mini principal" href="https://claude.ai/settings/connectors" target="_blank" title="Conectores da conta só se autorizam no site do claude.ai">Autorizar no claude.ai ↗</a>' : ''}
+                    ${m.status === 'needs-auth' && !/^claude\.ai /.test(m.name) ? `<button class="mini principal" data-mcp-entrar="${esc(m.name)}" title="Abre o /mcp do Claude no terminal para entrar na conta deste servidor">Entrar…</button>` : ''}
                     ${viva && m.status !== 'disabled' ? `<button class="mini" data-mcp-acao="reconectar" data-servidor="${esc(m.name)}">Reconectar</button>` : ''}
                     ${viva ? `<button class="mini" data-mcp-acao="${m.status === 'disabled' ? 'ligar' : 'desligar'}" data-servidor="${esc(m.name)}">${m.status === 'disabled' ? 'Ligar' : 'Desligar'}</button>` : ''}
                 </div>
@@ -6531,6 +6592,41 @@ janelaMcp.addEventListener('click', async (ev) => {
         } catch (e) { recado(e.message); }
         desenhaMcp();
     }
+});
+
+// Instalar e gerenciar plugins: sempre com confirmação; se o marketplace declara um comando, ele é mostrado inteiro antes de aceitar
+let pluginOcupado = false;
+async function acaoPlugin(acao, alvo) {
+    if (pluginOcupado) return;
+    if (!alvo) return recado('Escreva o que instalar.');
+    const frases = {
+        instalar: ['Instalar este plugin?', `<p>Plugins podem rodar comandos e servidores MCP no seu PC. Instalar <b>${esc(alvo)}</b>?</p>`, 'Instalar'],
+        atualizar: ['Atualizar este plugin?', `<p>Atualizar <b>${esc(alvo)}</b> baixa código novo para o seu PC.</p>`, 'Atualizar'],
+        desinstalar: ['Desinstalar este plugin?', `<p>Desinstalar <b>${esc(alvo)}</b>?</p>`, 'Desinstalar'],
+        'mercado-adicionar': ['Adicionar este marketplace?', `<p>Um marketplace é um catálogo de plugins. Adicionar <b>${esc(alvo)}</b>? Só adicione de quem você confia.</p>`, 'Adicionar'],
+        'mercado-remover': ['Remover este marketplace?', `<p>Remover <b>${esc(alvo)}</b>? Os plugins já instalados dele continuam.</p>`, 'Remover'],
+    }[acao];
+    if (!frases || !(await confirmaNaPagina(...frases))) return;
+    pluginOcupado = true;
+    recado('Trabalhando… pode levar um minuto.');
+    try {
+        let r = await api('/api/plugins/acao', { acao, alvo });
+        if (r.precisaConfirmar) {
+            const ok = await confirmaNaPagina('O marketplace quer rodar este comando',
+                `<p>Origem: <b>${esc(r.mercado || 'desconhecida')}</b>. Este é o comando inteiro; só aceite se você entende o que ele faz.</p><pre class="comando-plugin">${esc(r.comando)}</pre>`, 'Aceitar e continuar');
+            if (!ok) return recado('Cancelado. Nada foi instalado.');
+            r = await api('/api/plugins/acao', { acao, alvo, aceitarComando: r.sha256 });
+            if (r.precisaConfirmar) throw new Error('O comando do marketplace mudou. Nada foi instalado; tente de novo.');
+        }
+        recado((r.mensagem || 'Pronto.') + ' Vale para conversas abertas depois.');
+    } catch (e) { recado(e.message); }
+    finally { pluginOcupado = false; abreConfig('plugins'); }
+}
+janelaConfig.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-plug]');
+    if (!b) return;
+    const alvo = b.dataset.alvo || (document.getElementById(b.dataset.campo) || {}).value || '';
+    acaoPlugin(b.dataset.plug, alvo.trim());
 });
 janelaConfig.addEventListener('change', async (ev) => {
     const ativo = ev.target.closest('[data-ag-ativo]');
@@ -7289,6 +7385,15 @@ async function enviaMensagem() {
 }
 
 document.getElementById('formMensagem').addEventListener('submit', (ev) => { ev.preventDefault(); enviaMensagem(); });
+// Bolinha do contexto: compacta a conversa (/compact) sem perder o rascunho da caixa
+document.getElementById('chipContexto').addEventListener('click', async () => {
+    const campo = document.getElementById('mensagem');
+    if (anexosPendentes.length) return recado('Envie ou remova os anexos antes de compactar.');
+    const rascunho = campo.value;
+    campo.value = '/compact';
+    await enviaMensagem();
+    if (!campo.value || campo.value === '/compact') { campo.value = rascunho; ajustaAlturaCaixa(); }
+});
 // Enter envia; Shift+Enter quebra linha (como no VS Code). Ctrl+Enter continua enviando.
 document.getElementById('mensagem').addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); enviaMensagem(); }
@@ -8547,6 +8652,80 @@ setInterval(atualizaChat, 1000);
             try { localStorage.setItem(chave, ligado ? '1' : '0'); } catch (e) { /* sem armazenamento */ }
         });
     }
+})();
+
+// Tela de login: só na janela principal. O app apenas consulta o estado e aciona o fluxo oficial do Claude Code
+// (abre o navegador); senha e token nunca passam por aqui. Sem checagem possível (null) ou com chave de API
+// no ambiente (viaAmbiente), a tela não bloqueia o app.
+(function () {
+    if (JANELA_SECUNDARIA) return;
+    const tela = document.getElementById('telaLogin');
+    const passo1 = document.getElementById('loginPasso1'), passo2 = document.getElementById('loginPasso2');
+    const erroEl = document.getElementById('loginErro'), planoB = document.getElementById('loginPlanoB'), linkEl = document.getElementById('loginUrl');
+    let esperando = null, aberta = false;
+
+    const mostraErro = (texto) => { erroEl.textContent = texto || ''; erroEl.hidden = !texto; };
+    const mostraPasso = (n) => { passo1.hidden = n !== 1; passo2.hidden = n !== 2; };
+    async function consulta() {
+        try { return await getPainel('/api/auth/estado'); } catch (e) { return null; }
+    }
+    function abreTela() {
+        if (aberta) return;
+        aberta = true; tela.hidden = false; mostraPasso(1); mostraErro('');
+    }
+    function fechaTela() {
+        if (!aberta) return;
+        aberta = false; tela.hidden = true; clearInterval(esperando); esperando = null;
+        recado('Login feito. Se alguma conversa falhou por autenticação, envie a mensagem de novo.');
+        carregaSessoes();
+    }
+    async function verifica() {
+        const s = await consulta();
+        if (!s) return;
+        if (!aberta && s.loggedIn === false && !s.viaAmbiente) abreTela();
+        else if (aberta && (s.loggedIn || s.viaAmbiente)) fechaTela();
+        // O processo de login acabou sem concluir (falhou, demorou demais ou foi fechado): volta ao início
+        else if (aberta && !passo2.hidden && s.loggedIn === false && s.loginEmAndamento === false) {
+            clearInterval(esperando); esperando = null;
+            mostraPasso(1); mostraErro('O login não foi concluído. Tente de novo.');
+        }
+    }
+    async function entrar(tipo) {
+        mostraErro('');
+        try {
+            const r = await api('/api/auth/entrar', { tipo });
+            mostraPasso(2);
+            // Plano B: o endereço só aparece se for https de um site da Anthropic
+            let url = null;
+            try { const u = new URL(r.url || ''); if (u.protocol === 'https:' && /(^|\.)(claude\.ai|anthropic\.com|claude\.com)$/.test(u.hostname)) url = u.href; } catch (e) { /* sem URL */ }
+            planoB.hidden = !url;
+            if (url) { linkEl.href = url; linkEl.textContent = url; }
+            clearInterval(esperando);
+            esperando = setInterval(verifica, 2000);
+        } catch (e) { mostraErro(e.message); mostraPasso(1); }
+    }
+    document.getElementById('btnLoginClaude').addEventListener('click', () => entrar('claudeai'));
+    document.getElementById('btnLoginConsole').addEventListener('click', () => entrar('console'));
+    document.getElementById('formLoginCodigo').addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const campo = document.getElementById('loginCodigo'), botao = document.getElementById('btnLoginCodigo');
+        mostraErro('');
+        botao.disabled = true; botao.textContent = 'Entrando…';
+        try {
+            const r = await api('/api/auth/codigo', { codigo: campo.value });
+            campo.value = '';   // o código não fica na tela nem em lugar nenhum
+            if (r.logado) await verifica();
+            else mostraErro(r.erro || 'O login não foi concluído.');
+        } catch (e) { mostraErro(e.message); }
+        finally { botao.disabled = false; botao.textContent = 'Continuar'; }
+    });
+    document.getElementById('btnLoginCancelar').addEventListener('click', async () => {
+        clearInterval(esperando); esperando = null;
+        try { await api('/api/auth/cancelar', {}); } catch (e) { /* já acabou */ }
+        mostraPasso(1);
+    });
+    verifica();
+    setInterval(() => { if (!aberta) verifica(); }, 30000);
 })();
 </script>
 </body>

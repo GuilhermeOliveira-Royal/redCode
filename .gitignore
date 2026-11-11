@@ -3,6 +3,7 @@ dist/
 
 # Dados pessoais e de uso (ficam em cada PC)
 dados.json
+vivas.json
 anexos/
 desktop/janela.json
 desktop/navegador.json
