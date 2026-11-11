@@ -708,7 +708,37 @@ app.whenReady().then(async () => {
     if (avisoAtualizado && bandeja.displayBalloon) bandeja.displayBalloon({ title: 'Red Code', content: avisoAtualizado });
     // Confere se há versão nova (release pelo exe, commits pelo código) e avisa num cartão no rodapé
     iniciaVigiaAtualizacao();
-    if (!globalShortcut.register('Control+Shift+Space', alternaJanela)) console.log('Atalho Ctrl+Shift+Espaço já está em uso por outro programa');
+    registraAtalhoJanela(leAtalhoJanela());
+});
+
+// ---------- Atalho global (mostrar/esconder o Red Code de qualquer programa): trocável em Configurações › Atalhos ----------
+const ARQ_ATALHOS = path.join(PASTA_DADOS, 'atalhos.json');
+const ATALHO_JANELA_PADRAO = 'Control+Shift+Space';
+let atalhoJanela = '';
+function leAtalhoJanela() {
+    try { const a = JSON.parse(fs.readFileSync(ARQ_ATALHOS, 'utf8')).janela; if (typeof a === 'string') return a; } catch (e) { /* sem arquivo: o padrão */ }
+    return ATALHO_JANELA_PADRAO;
+}
+// Troca o atalho; se o novo não registra (outro programa usa, ou combinação inválida), volta ao anterior. '' = desligado
+function registraAtalhoJanela(novo) {
+    const antes = atalhoJanela;
+    if (antes) { try { globalShortcut.unregister(antes); } catch (e) { /* já solto */ } }
+    atalhoJanela = '';
+    if (!novo) return true;
+    let ok = false;
+    try { ok = globalShortcut.register(novo, alternaJanela); } catch (e) { ok = false; }
+    if (ok) { atalhoJanela = novo; return true; }
+    registra(`atalho ${novo} não registrou (em uso por outro programa?)`);
+    if (antes && antes !== novo) { try { if (globalShortcut.register(antes, alternaJanela)) atalhoJanela = antes; } catch (e) { /* fica sem */ } }
+    return false;
+}
+ipcMain.handle('painel:atalho-janela', (ev, novo) => {
+    if (!janela || ev.sender !== janela.webContents) return null;
+    if (novo === undefined) return { atalho: atalhoJanela || leAtalhoJanela(), padrao: ATALHO_JANELA_PADRAO };
+    const pedido = String(novo || '');
+    const ok = registraAtalhoJanela(pedido);
+    if (ok) { try { fs.writeFileSync(ARQ_ATALHOS, JSON.stringify({ janela: pedido })); } catch (e) { /* fica só nesta sessão */ } }
+    return { ok, atalho: atalhoJanela, padrao: ATALHO_JANELA_PADRAO };
 });
 
 app.on('before-quit', () => {

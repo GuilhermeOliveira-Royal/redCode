@@ -69,6 +69,7 @@ const clipe = ClipeMusica(document.body, {
 });
 document.getElementById('anexar').addEventListener('click', () => { canal.postMessage({ tipo: 'anexar' }); window.close(); });
 document.getElementById('fechar').addEventListener('click', () => { canal.postMessage({ tipo: 'fechar' }); window.close(); });
+canal.addEventListener('message', (ev) => { if (ev.data && ev.data.tipo === 'fecha-janela') window.close(); });
 canal.postMessage({ tipo: 'desanexou' });
 </script>
 </body>

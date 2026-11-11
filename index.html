@@ -2319,6 +2319,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
                 <button role="tab" data-aba-config="worktrees" aria-selected="false" data-busca="worktrees copias isoladas branches"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.8"/><circle cx="4.5" cy="12.5" r="1.8"/><circle cx="11.5" cy="5.5" r="1.8"/><path d="M4.5 5.3v5.4M11.5 7.3c0 3-4 2.2-6.4 4"/></svg>Worktrees</button>
                 <button role="tab" data-aba-config="github" aria-selected="false" data-busca="github prs ci gh"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13.5c-3 1-3-1.5-4.2-1.8M10 15v-2.4c0-.7.1-1.1-.4-1.6 2-.2 4.1-1 4.1-4.4 0-.9-.3-1.7-.9-2.4.1-.4.3-1.3-.1-2.4 0 0-.7-.2-2.4.9a8 8 0 0 0-4.4 0C4.2 1.6 3.5 1.8 3.5 1.8c-.4 1.1-.2 2-.1 2.4-.6.7-.9 1.5-.9 2.4 0 3.4 2.1 4.2 4.1 4.4-.4.4-.5.9-.4 1.6V15"/></svg>GitHub</button>
                 <div class="config-grupo">Este computador</div>
+                <button role="tab" data-aba-config="atalhos" aria-selected="false" data-busca="atalhos teclas teclado comandos combinacao video terminal"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="4" width="13" height="8.5" rx="1.5"/><path d="M4 6.8h.01M6.5 6.8h.01M9 6.8h.01M11.5 6.8h.01M5 9.8h6"/></svg>Atalhos</button>
                 <button role="tab" data-aba-config="sistema" aria-selected="false" data-busca="sistema avisos notificacoes windows iniciar com o windows"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="8.5" rx="1.2"/><path d="M5.5 14h5M8 11v3"/></svg>Sistema</button>
                 <button role="tab" data-aba-config="dev" aria-selected="false" data-busca="desenvolvedor versao porta logs reiniciar servidor"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2a3.5 3.5 0 0 0-3.2 4.9L2.5 11.7v1.8h1.8l4.8-4.8A3.5 3.5 0 1 0 10.5 2z"/></svg>Desenvolvedor</button>
             </nav>
@@ -2426,6 +2427,7 @@ html[data-tema-efetivo="claro"] .pet-corpo::before, html[data-tema-efetivo="clar
             <dt><kbd>n</kbd></dt><dd>Continuar esta conversa numa conversa nova</dd>
             <dt><kbd>c</kbd></dt><dd>Escrever na caixa de mensagem</dd>
             <dt><kbd>m</kbd></dt><dd>Abrir ou fechar o mapa de agentes</dd>
+            <dt><kbd>Alt</kbd> + <kbd>V</kbd></dt><dd>Abrir ou fechar o vídeo no canto (este e os outros com Ctrl/Alt mudam em Configurações › Atalhos)</dd>
             <dt><kbd>Esc</kbd></dt><dd>Interromper a resposta em andamento (pelo painel)</dd>
             <dt><kbd>/</kbd> na caixa</dt><dd>Comandos e skills (ex.: /compact, /testar-tela)</dd>
             <dt><kbd>@</kbd> na caixa</dt><dd>Citar um arquivo do projeto</dd>
@@ -3171,7 +3173,6 @@ async function ligaTrello() {
 // Busca global
 function abreBuscaGlobal() { document.getElementById('janelaBusca').hidden = false; document.getElementById('campoBusca').focus(); }
 document.getElementById('btnBuscaGlobal').addEventListener('click', abreBuscaGlobal);
-document.addEventListener('keydown', (ev) => { if (ev.ctrlKey && ev.shiftKey && ev.key.toLowerCase() === 'f') { ev.preventDefault(); abreBuscaGlobal(); } });
 document.getElementById('formBusca').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const q = document.getElementById('campoBusca').value.trim();
@@ -4054,7 +4055,6 @@ document.getElementById('btnMandarSaida').addEventListener('click', () => {
     recado('Saída do terminal no campo de mensagem');
 });
 // Ctrl + ` abre ou esconde
-document.addEventListener('keydown', (ev) => { if (ev.ctrlKey && (ev.key === '`' || ev.code === 'Backquote')) { ev.preventDefault(); alternaTerminal(); } });
 // Altura ajustável (guardada neste navegador)
 (() => {
     const painel = document.getElementById('painelTerminal');
@@ -6106,7 +6106,7 @@ const SECOES_CONFIG = {
             + '<h3 class="config-titulo">Código</h3>'
             + linhaConfig('Visual das conversas de código', '', opcoesConfig('visualCodigo', Object.entries(VISUAIS_CODIGO), visualCodigo), 'editor ao vivo')
             + linhaConfig('Mostrar o código formatado', 'Como o Alt+Shift+F do VS Code (só visualização: o arquivo não muda).', chaveConfig('formatado', ev.formatado))
-            + linhaConfig('Quebra de linha no editor', 'Atalho: Alt+Z.', chaveConfig('quebra', quebraLinha))
+            + linhaConfig('Quebra de linha no editor', 'Atalho: ' + textoAtalho(teclaDe('quebra')) + ' (troca em Atalhos).', chaveConfig('quebra', quebraLinha))
             + '<h3 class="config-titulo">Economia de tokens</h3>'
             + linhaConfig('Compactar a conversa sozinho', 'Quando a conversa passa de cerca de 150 mil tokens, o Claude resume o que veio antes e segue com o resumo, em vez de reenviar tudo a cada mensagem. Gasta menos e evita estourar o limite; em troca, detalhes antigos podem se perder no resumo. Vale para conversas novas ou retomadas (e também para o VS Code, pois fica no settings.json do Claude). Desligado, o Claude usa o padrão dele. Para compactar na hora, clique na bolinha de contexto da conversa.', chaveConfig('economia', !!dados.economia), 'economizar tokens compactar contexto')
             + '<h3 class="config-titulo">Pastas extras</h3>'
@@ -6130,6 +6130,18 @@ const SECOES_CONFIG = {
         return '<h3 class="config-titulo">Skills</h3>'
             + `<p class="nota">${cwd ? 'As suas, as do projeto desta conversa e as dos plugins.' : 'Sem conversa aberta: só as skills do disco. Abra uma conversa para ver as do projeto e dos plugins.'} Para usar, digite / no campo de mensagem.</p>`
             + (skills.length ? skills.map(c => `<div class="config-skill" data-busca="${esc(semAcento(c.nome + ' ' + (c.descricao || '') + ' ' + c.origem))}"><b>/${esc(c.nome)}</b><span class="etiqueta">${esc(c.origem)}</span><small>${esc(c.descricao || '')}</small></div>`).join('') : '<p class="nota">Nenhuma skill encontrada.</p>');
+    },
+    async atalhos() {
+        // Global (mostrar/esconder o Red Code de qualquer programa): só no app; o resto vale com a janela do Red Code em foco
+        let janelaApp = null;
+        if (window.painelDesktop && window.painelDesktop.atalhoJanela) { try { janelaApp = await window.painelDesktop.atalhoJanela(); } catch (e) { /* app antigo */ } }
+        const linha = (id, nome, tecla, padrao, desc) => linhaConfig(nome, desc,
+            `<span class="config-controle"><button class="mini" data-atalho-gravar="${id}" title="Clique e aperte a combinação nova (Esc cancela)"><kbd>${esc(textoAtalho(tecla))}</kbd></button>`
+            + `<button class="mini" data-atalho-padrao="${id}" ${tecla === padrao ? 'disabled' : ''} title="Voltar para ${esc(textoAtalho(padrao))}">Padrão</button></span>`, 'atalho tecla ' + nome);
+        return '<h3 class="config-titulo">Atalhos</h3>'
+            + '<p class="nota">Clique na combinação e aperte as teclas novas (com Ctrl ou Alt; Esc cancela). As de uma letra só (/, ?, j, k...) estão na ajuda, tecla ?.</p>'
+            + ATALHOS.map(a => linha(a.id, a.nome, teclaDe(a.id), a.padrao, a.soEditor ? 'Com o editor ao vivo aberto.' : '')).join('')
+            + (janelaApp ? linha('janela', 'Mostrar ou esconder o Red Code', deAcelerador(janelaApp.atalho), deAcelerador(janelaApp.padrao), 'Funciona de qualquer programa, mesmo com o Red Code escondido na bandeja.') : '');
     },
     async sistema() {
         const temInicio = !!(window.painelDesktop && window.painelDesktop.inicioWindows);
@@ -6252,6 +6264,15 @@ janelaConfig.addEventListener('click', async (evt) => {
     const abrirRegra = evt.target.closest('[data-abrir-regra]');
     if (abrirRegra) { evt.preventDefault(); return abreArquivoCitado(abrirRegra.dataset.abrirRegra, evt.ctrlKey); }
     const acao = evt.target.closest('[data-config-acao]');
+    const gravar = evt.target.closest('[data-atalho-gravar]');
+    if (gravar) { comecaGravarAtalho(gravar); return; }
+    const padrao = evt.target.closest('[data-atalho-padrao]');
+    if (padrao) {
+        const id = padrao.dataset.atalhoPadrao;
+        if (id === 'janela') { const r = await window.painelDesktop.atalhoJanela(paraAcelerador('Ctrl+Shift+Space')); if (!r || !r.ok) recado('Não deu: outro programa já usa Ctrl+Shift+Espaço'); }
+        else { const g = atalhosGravados(); delete g[id]; gravaPref('atalhos', JSON.stringify(g)); }
+        return abreConfig('atalhos');
+    }
     if (acao && acao.dataset.configAcao === 'atualizacoes') {
         const texto = acao.textContent;
         acao.disabled = true; acao.textContent = 'Procurando…';
@@ -6271,6 +6292,37 @@ janelaConfig.addEventListener('click', async (evt) => {
         try { await api('/api/reiniciar', {}); recado('Reinício agendado: acontece quando nada estiver trabalhando'); } catch (e) { recado('Não consegui agendar: ' + e.message); }
     }
 });
+// Atalhos: espera a próxima combinação (com Ctrl/Alt ou F1-F12); Esc cancela. Recusa a repetida e as de edição de texto
+function comecaGravarAtalho(botao) {
+    if (gravandoAtalho) gravandoAtalho.fim();
+    const id = botao.dataset.atalhoGravar;
+    const antes = botao.innerHTML;
+    botao.innerHTML = '<kbd>Aperte as teclas…</kbd>';
+    botao.classList.add('ligado');
+    const pega = async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (e.key === 'Escape') return fim();
+        if (['Control', 'Alt', 'Shift', 'Meta', 'AltGraph'].includes(e.key)) return;
+        const t = teclaDoEvento(e);
+        if (!t || (!/^(Ctrl|Alt)\+/.test(t) && !/^(Shift\+)?F\d/.test(t))) return recado('Use Ctrl ou Alt junto (ou uma tecla F1 a F12)');
+        if (ATALHOS_RESERVADOS.includes(t)) return recado(textoAtalho(t) + ' fica para o Windows e a edição de texto: escolha outra');
+        const outro = ATALHOS.find(x => x.id !== id && teclaDe(x.id) === t);
+        if (outro) return recado(textoAtalho(t) + ' já é de: ' + outro.nome);
+        fim();
+        if (id === 'janela') {
+            const r = await window.painelDesktop.atalhoJanela(paraAcelerador(t));
+            if (!r || !r.ok) recado('Não deu: outro programa já usa ' + textoAtalho(t));
+            else recado('Atalho trocado: ' + textoAtalho(t));
+        } else {
+            const g = atalhosGravados(); g[id] = t; gravaPref('atalhos', JSON.stringify(g));
+            recado('Atalho trocado: ' + textoAtalho(t));
+        }
+        abreConfig('atalhos');
+    };
+    const fim = () => { document.removeEventListener('keydown', pega, true); if (gravandoAtalho && gravandoAtalho.botao === botao) gravandoAtalho = null; if (botao.isConnected) { botao.innerHTML = antes; botao.classList.remove('ligado'); } };
+    gravandoAtalho = { id, botao, fim };
+    document.addEventListener('keydown', pega, true);
+}
 // ---------- Regras e agentes: subagentes por projeto, com editar / ativar / criar / apagar ----------
 let regrasAtuais = null;   // última resposta de /api/regras (os formulários leem daqui)
 const MODELOS_AGENTE = [['inherit', 'Igual à conversa'], ['haiku', 'Haiku'], ['sonnet', 'Sonnet'], ['opus', 'Opus']];
@@ -8954,24 +9006,16 @@ elEv('evCopiar').addEventListener('click', async () => {
         recado('Arquivo copiado (' + plural(info.conteudo.split('\n').length, 'linha', 'linhas') + ')');
     } catch (e) { recado('Não deu para copiar: ' + e.message); }
 });
-// Quebra de linha: ligada por padrão; Alt+Z alterna (igual ao VS Code)
+// Quebra de linha: ligada por padrão; Alt+Z alterna (igual ao VS Code; trocável em Configurações › Atalhos)
 let quebraLinha = true;
 try { quebraLinha = localStorage.getItem('painelEditorQuebra') !== '0'; } catch (e) { /* sem armazenamento */ }
 elEv('evCodigo').classList.toggle('quebra', quebraLinha);
-document.addEventListener('keydown', (evt) => {
-    if (!ev.ligado || !evt.altKey || evt.shiftKey || evt.ctrlKey || evt.key.toLowerCase() !== 'z') return;
-    if (evt.target.closest && evt.target.closest('textarea, input, [contenteditable="true"]')) return;
-    evt.preventDefault();
+function alternaQuebra() {
     quebraLinha = !quebraLinha;
     elEv('evCodigo').classList.toggle('quebra', quebraLinha);
     try { localStorage.setItem('painelEditorQuebra', quebraLinha ? '1' : '0'); } catch (e) { /* sem armazenamento */ }
-    recado(quebraLinha ? 'Quebra de linha ligada (Alt+Z)' : 'Quebra de linha desligada (Alt+Z)');
-});
-document.addEventListener('keydown', (evt) => {
-    if (!ev.ligado || !evt.altKey || !evt.shiftKey || evt.ctrlKey || evt.key.toLowerCase() !== 'f') return;
-    if (evt.target.closest && evt.target.closest('textarea, input, [contenteditable="true"]')) return;
-    evt.preventDefault(); alternaFormatado();
-});
+    recado((quebraLinha ? 'Quebra de linha ligada' : 'Quebra de linha desligada') + ` (${textoAtalho(teclaDe('quebra'))})`);
+}
 elEv('evVscode').addEventListener('click', () => { if (ev.arquivo) { window.open(linkVscode(ev.arquivo, ev.linha)); recado('Abrindo no VS Code'); } });
 elEv('evEditor').addEventListener('click', () => { if (ev.arquivo) abreEditor(ev.arquivo, ev.linha); });
 elEv('evPainel').addEventListener('click', () => document.getElementById('btnLateral').click());
@@ -9018,11 +9062,58 @@ for (const b of document.querySelectorAll('.trilho-lista [data-espelha]')) {
     copia();
     new MutationObserver(copia).observe(original, { attributes: true, attributeFilter: ['aria-pressed'] });
 }
+
+/* ---------- Atalhos de teclado: um registro só, trocável em Configurações › Atalhos ---------- */
+// Guardados como "Ctrl+Alt+Shift+Tecla" pela tecla física (evt.code), então valem igual em teclado ABNT e americano
+const ATALHOS = [
+    { id: 'video', nome: 'Abrir ou fechar o vídeo no canto', padrao: 'Alt+V', faz: () => alternaVideoCanto() },
+    { id: 'busca', nome: 'Procurar em todas as conversas', padrao: 'Ctrl+Shift+F', faz: () => abreBuscaGlobal() },
+    { id: 'terminal', nome: 'Abrir ou fechar o terminal', padrao: 'Ctrl+`', faz: () => alternaTerminal() },
+    { id: 'lista', nome: 'Mostrar ou esconder a lista de conversas', padrao: 'Ctrl+B', faz: () => escondeLista(!document.body.classList.contains('lista-escondida')) },
+    // Só com o editor ao vivo aberto e fora de campo de texto
+    { id: 'quebra', nome: 'Quebra de linha no editor ao vivo', padrao: 'Alt+Z', soEditor: true, faz: () => alternaQuebra() },
+    { id: 'formatado', nome: 'Código formatado no editor ao vivo', padrao: 'Alt+Shift+F', soEditor: true, faz: () => alternaFormatado() },
+];
+// Os de edição de texto não podem ser tomados (copiar, colar, desfazer...)
+const ATALHOS_RESERVADOS = ['Ctrl+A', 'Ctrl+C', 'Ctrl+V', 'Ctrl+X', 'Ctrl+Z', 'Ctrl+Y', 'Ctrl+Shift+Z', 'Ctrl+S', 'Ctrl+F', 'Ctrl+R', 'Alt+F4'];
+const TECLAS_CODIGO = { Backquote: '`', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']', Backslash: '\\', IntlBackslash: '\\', Semicolon: ';', Quote: "'", Comma: ',', Period: '.', Slash: '/', IntlRo: '/', Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End', PageUp: 'PageUp', PageDown: 'PageDown', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right' };
+function teclaDoEvento(evt) {
+    const c = evt.code || '';
+    let t = /^Key([A-Z])$/.test(c) ? c.slice(3) : /^Digit(\d)$/.test(c) ? c.slice(5) : /^Numpad(\d)$/.test(c) ? 'Num' + c.slice(6) : /^F\d{1,2}$/.test(c) ? c : TECLAS_CODIGO[c];
+    if (!t) return '';
+    return [evt.ctrlKey && 'Ctrl', evt.altKey && 'Alt', evt.shiftKey && 'Shift', t].filter(Boolean).join('+');
+}
+const atalhosGravados = () => { try { return JSON.parse(lePref('atalhos', '{}')) || {}; } catch (e) { return {}; } };
+// A combinação de um atalho agora ('' = desligado)
+function teclaDe(id) { const g = atalhosGravados(); const a = ATALHOS.find(x => x.id === id); return id in g ? g[id] : (a ? a.padrao : ''); }
+const textoAtalho = (t) => t ? t.replace(/\bSpace\b/, 'Espaço').replace(/\bUp\b/, '↑').replace(/\bDown\b/, '↓').replace(/\bLeft\b/, '←').replace(/\bRight\b/, '→') : 'desligado';
+// Atalho global do app (mostrar/esconder de qualquer programa): o Electron usa "Control" no lugar de "Ctrl"
+const paraAcelerador = (t) => t.replace(/^Ctrl\b/, 'Control');
+const deAcelerador = (t) => String(t || '').replace(/^(Control|CommandOrControl|CmdOrCtrl)\b/, 'Ctrl');
+let gravandoAtalho = null;   // { id, botao } enquanto espera a pessoa apertar a combinação nova
 document.addEventListener('keydown', (evt) => {
-    if (!evt.ctrlKey || evt.altKey || evt.shiftKey || evt.metaKey || evt.key.toLowerCase() !== 'b') return;
+    if (gravandoAtalho || evt.repeat) return;
+    const t = teclaDoEvento(evt);
+    if (!t || !/^(Ctrl|Alt)\+/.test(t) && !/^(Shift\+)?F\d/.test(t)) return;
+    const a = ATALHOS.find(x => teclaDe(x.id) === t);
+    if (!a) return;
+    if (a.soEditor && (!ev.ligado || (evt.target.closest && evt.target.closest('textarea, input, [contenteditable="true"]')))) return;
     evt.preventDefault();
-    escondeLista(!document.body.classList.contains('lista-escondida'));
+    a.faz();
 });
+// Vídeo no canto: abre ou fecha (o mesmo do botão do player); desanexado em janela própria, fecha a janela
+function alternaVideoCanto() {
+    if (!SUPORTA_CLIPE) return recado('O vídeo no canto não está disponível aqui.');
+    if (lePref('clipe', '') === 'solto' && !clipePip) {
+        new BroadcastChannel('redcode-clipe').postMessage({ tipo: 'fecha-janela' });
+        gravaPref('clipe', '');
+        recado('Vídeo fechado');
+        return desenhaMidia();
+    }
+    if (clipePip) { fechaPip(true); recado('Vídeo fechado'); }
+    else { abrePip(); if (playerMidia.hidden) recado('Vídeo ligado: aparece quando alguma música estiver tocando'); }
+    desenhaMidia();
+}
 
 /* ---------- Largura das colunas (arrastar a borda; duplo clique volta ao padrão) ---------- */
 const LARGURAS = {

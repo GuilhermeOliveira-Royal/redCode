@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('painelDesktop', {
     inicioWindows: () => ipcRenderer.invoke('painel:inicio-windows'),
     defineInicioWindows: (ligar) => ipcRenderer.invoke('painel:define-inicio-windows', !!ligar),
     abrirLogs: () => ipcRenderer.invoke('painel:abrir-logs'),
+    // Configurações › Atalhos: atalho global de mostrar/esconder (sem argumento = só lê; '' = desliga)
+    atalhoJanela: (novo) => ipcRenderer.invoke('painel:atalho-janela', novo === undefined ? undefined : String(novo)),
     // Versão nova (cartão no rodapé): estado atual, avisos de mudança e ações (baixar, reiniciar, dispensar)
     atualizacao: {
         estado: () => ipcRenderer.invoke('painel:atualizacao-estado'),
